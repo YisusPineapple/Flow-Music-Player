@@ -1,0 +1,6 @@
+{
+  "name": "Lune",
+  "description": "An advanced, elegant offline music player with smart mixes, equalizer, dynamic lyrics, and Hi-Fi audio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
