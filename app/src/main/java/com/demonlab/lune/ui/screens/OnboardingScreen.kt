@@ -64,9 +64,21 @@ import kotlinx.coroutines.delay
 fun OnboardingScreen(
     onStartClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager.getInstance(context) }
+    val ultraSaver = settingsManager.isUltraSaverActive(context)
+    val lowResource = settingsManager.isLowResourceVisualsActive(context)
     var currentStep by remember { mutableIntStateOf(0) }
     
-    Crossfade(targetState = currentStep, label = "OnboardingCrossfade") { step ->
+    Crossfade(
+        targetState = currentStep,
+        animationSpec = tween(durationMillis = when {
+            ultraSaver -> 0
+            lowResource -> 140
+            else -> 260
+        }),
+        label = "OnboardingCrossfade"
+    ) { step ->
         when (step) {
             0 -> WelcomeStep(onStartClick = { currentStep = 1 })
             1 -> PermissionStep(onNext = { currentStep = 2 })
@@ -84,20 +96,26 @@ fun OnboardingScreen(
 
 @Composable
 fun WelcomeStep(onStartClick: () -> Unit) {
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager.getInstance(context) }
+    val lowResource = settingsManager.isLowResourceVisualsActive(context)
     val isDark = isSystemInDarkTheme()
     val diamondsColor = if (isDark) Color.White else Color.Black
     val noteColor = if (isDark) Color.Black else Color.White
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),

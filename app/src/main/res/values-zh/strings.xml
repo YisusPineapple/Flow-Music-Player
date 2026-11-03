@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">设置</string>
     <string name="about">关于</string>
     <string name="version">版本</string>
@@ -55,7 +55,7 @@
     <string name="tab_genres">流派</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">Lune AI Core</string>
+    <string name="ai_core_title">Flow AI Core</string>
     <string name="ai_musical_intelligence">音乐智能</string>
     <string name="ai_local_learning_desc">100% 本地离线与隐私学习</string>
     <string name="ai_affinity_flow">曲库流派与偏好流动</string>
@@ -265,7 +265,7 @@
     <string name="visualizer_mini_player">迷你播放器显示</string>
     <string name="credits">致谢</string>
     <string name="credits_desc">测试、设计建议和图标</string>
-    <string name="creator_desc">Lune 音乐播放器的创建者和维护者</string>
+    <string name="creator_desc">Lune 音乐播放器的原作者（Flow 上游项目）</string>
     <string name="gesture">手势</string>
     <string name="gesture_desc">自定义应用手势</string>
     <string name="enable_gestures">启用手势</string>
@@ -320,7 +320,7 @@
     <string name="sort_duration">时长</string>
     <string name="sort_date_added">添加日期</string>
     <string name="backup_warning_title">重要提示</string>
-    <string name="backup_warning_desc">Lune 仅能导入由本应用导出的播放列表。请确保您的设备上有相应的音乐文件以正常播放。</string>
+    <string name="backup_warning_desc">Flow 可导入由本应用导出的播放列表（同时兼容 Lune 备份）。请确保您的设备上有相应的音乐文件以正常播放。</string>
     <string name="export_playlists">导出播放列表</string>
     <string name="export_playlists_desc">将播放列表保存到文件</string>
     <string name="import_playlists">导入播放列表</string>
@@ -367,8 +367,8 @@
     <string name="onboarding_perm_music_title">音乐和音频</string>
     <string name="onboarding_perm_music_desc">扫描、索引和播放设备上存储的音乐收藏所必需。</string>
     <string name="onboarding_perm_manage_files_title">音乐文件夹访问</string>
-    <string name="onboarding_perm_manage_files_desc">选择您的音乐文件夹，让 Lune 安全地组织和管理您的音乐库。</string>
-    <string name="onboarding_welcome_back">欢迎使用 Lune</string>
+    <string name="onboarding_perm_manage_files_desc">选择您的音乐文件夹，让 Flow 安全地组织和管理您的音乐库。</string>
+    <string name="onboarding_welcome_back">欢迎使用 Flow</string>
     <string name="onboarding_listen_style">有风格地聆听</string>
     <string name="onboarding_feature_hifi">HiFi 音频支持</string>
     <string name="onboarding_feature_title">可自定义标题</string>
@@ -381,10 +381,10 @@
     <string name="onboarding_reminder_desc">如果您跳过了任何权限，稍后可以在 设置 > 安全 > 权限 中轻松启用。</string>
     <string name="onboarding_reminder_button">明白了</string>
     <string name="onboarding_folder_visibility_title">文件夹可见性</string>
-    <string name="onboarding_folder_visibility_desc">默认情况下，Lune 仅显示您选择的音乐文件夹中的歌曲。启用此选项可从一开始就显示设备上的所有音乐文件夹。</string>
+    <string name="onboarding_folder_visibility_desc">默认情况下，Flow 仅显示您选择的音乐文件夹中的歌曲。启用此选项可从一开始就显示设备上的所有音乐文件夹。</string>
     <string name="onboarding_folder_visibility_label">显示所有文件夹</string>
     <string name="onboarding_support_title">支持项目</string>
-    <string name="onboarding_support_desc">如果您喜欢 Lune，请考虑通过 设置 > 关于 > 捐赠 支持我们。每份捐助都有助于应用持续发展！</string>
+    <string name="onboarding_support_desc">如果您喜欢 Flow，请考虑通过 设置 &gt; 关于 &gt; 捐赠 支持项目发展。每份捐助都有助于持续改进！</string>
     <string name="search_play_all">播放</string>
     <string name="search_shuffle">随机播放</string>
     <string name="playing_from">正在播放：%s</string>
@@ -434,9 +434,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">快捷播放</string>
-    <string name="open_in_lune">在 Lune 中打开</string>
+    <string name="open_in_lune">在 Flow 中打开</string>
     <string name="close">关闭</string>
-    <string name="cd_open_in_lune">在 Lune 中打开</string>
+    <string name="cd_open_in_lune">在 Flow 中打开</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">编辑歌词</string>
@@ -460,4 +460,122 @@
     <string name="auto_sync_backup">自动同步备份</string>
     <string name="auto_sync_backup_desc">播放列表或歌词更改时自动更新已导出的备份</string>
     <string name="auto_sync_requires_export">请先导出备份以启用自动同步</string>
+
+    <!-- Studio Crossfade, Automix, Blacklist, Covers & Metadata -->
+    <string name="adaptive_crossfade">AI 自适应时长</string>
+    <string name="adaptive_crossfade_desc">根据曲目能量与风格自动调整交叉淡化时长</string>
+    <string name="crossfade_silence_detection">智能尾奏与静音裁剪</string>
+    <string name="crossfade_silence_detection_desc">检测到结尾静音或能量衰减时提前开始过渡</string>
+    <string name="go_to_album">前往专辑</string>
+    <string name="blacklist_song">隐藏歌曲（黑名单）</string>
+    <string name="song_blacklisted_toast">歌曲已隐藏并加入黑名单</string>
+    <string name="manage_blacklist">黑名单与隐藏项目</string>
+    <string name="manage_blacklist_desc">管理已隐藏的歌曲和排除的文件夹</string>
+    <string name="blacklisted_songs">已隐藏歌曲</string>
+    <string name="blacklisted_folders">已隐藏文件夹</string>
+    <string name="blacklist_empty">暂无隐藏的歌曲或文件夹</string>
+    <string name="restore_item">恢复</string>
+    <string name="change_playlist_cover">更换封面</string>
+    <string name="remove_playlist_cover">重置封面</string>
+    <string name="playlist_cover_updated">播放列表封面已更新</string>
+    <string name="metadata_saved_file">标签已直接写入音频文件</string>
+    <string name="metadata_saved_local_fallback">已保存在 Flow 本地（文件只读）</string>
+    <string name="metadata_permission_needed">请授予文件访问权限以永久保存标签</string>
+
+    <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
+    <string name="replaygain_section">ReplayGain 与音量均衡</string>
+    <string name="replaygain_desc">通过内嵌标签或实时 RMS/LUFS 分析保持跨曲目一致响度</string>
+    <string name="replaygain_mode_off">关闭</string>
+    <string name="replaygain_mode_track">单曲</string>
+    <string name="replaygain_mode_album">专辑</string>
+    <string name="replaygain_mode_smart">智能专辑</string>
+    <string name="replaygain_preamp_tagged">前置增益（有标签曲目）</string>
+    <string name="replaygain_preamp_untagged">前置增益（无标签曲目）</string>
+    <string name="replaygain_fallback_analysis">智能 RMS/LUFS 分析</string>
+    <string name="replaygain_fallback_analysis_desc">使用超快 PCM 采样估算无 ReplayGain 或 R128 标签曲目的响度</string>
+    <string name="replaygain_prevent_clipping">防削波峰值限制器</string>
+    <string name="replaygain_prevent_clipping_desc">自动限制正增益，防止峰值失真爆音</string>
+    <string name="show_replaygain_badge">在播放器中显示 ReplayGain 徽章</string>
+    <string name="show_replaygain_badge_desc">在音质徽章旁实时显示 dB 响度补偿值</string>
+
+    <string name="gapless_section">无缝播放 (Gapless) 与扩展解码</string>
+    <string name="gapless_audio">真无缝播放 (Gapless)</string>
+    <string name="gapless_audio_desc">曲目之间采样级精准衔接，零静音间隙</string>
+    <string name="gapless_album_priority">连续播放专辑时优先无缝衔接</string>
+    <string name="gapless_album_priority_desc">按顺序播放同一专辑曲目时自动使用无缝衔接而非交叉淡化</string>
+    <string name="extended_formats_supported">支持格式：ALAC、AIFF/AIF、APE、WavPack (WV)、DSD (DSF/DFF)、M4A、MP4、MKV/MKA、WebM、Opus（立体声与 5.1/7.1）、E-AC3、AC-3、AC-4、DTS、WMA、CAF、FLAC、WAV、OGG、AAC、MP3</string>
+
+    <string name="multitag_title">多艺术家、多流派与白名单</string>
+    <string name="multitag_desc">配置艺术家/流派分隔符、标题 feat. 提取及受保护乐队名称</string>
+    <string name="enable_multi_artist">多艺术家索引</string>
+    <string name="enable_multi_artist_desc">将合作曲目分别归入每位参与艺术家名下</string>
+    <string name="enable_multi_genre">多流派索引</string>
+    <string name="enable_multi_genre_desc">同时将曲目归入多个音乐流派</string>
+    <string name="split_semicolon">分号 (;)</string>
+    <string name="split_comma">逗号 (,)</string>
+    <string name="split_slash">斜杠 (/ | \\)</string>
+    <string name="split_ampersand">连接符 (&amp;)</string>
+    <string name="split_feat_keywords">合作词 (ft., feat., con, with, vs., x)</string>
+    <string name="extract_artists_from_title">从歌曲标题提取合作艺术家</string>
+    <string name="extract_artists_from_title_desc">识别标题中的 (ft. 艺术家) 或 [feat. 艺术家]，且不产生重复或冲突</string>
+    <string name="clean_feat_from_title">在显示标题中隐藏已提取的 (ft. …)</string>
+    <string name="clean_feat_from_title_desc">保持歌曲标题整洁，同时完整索引合作艺术家</string>
+    <string name="whitelist_section">受保护白名单（永不拆分）</string>
+    <string name="whitelist_desc">如 AC/DC、Tyler, The Creator 或 R&amp;B 等名称不会被打断拆分。可在下方添加自定义项：</string>
+    <string name="whitelist_input_hint">添加艺术家或流派（例如 Simon &amp; Garfunkel）</string>
+    <string name="whitelist_add">保护</string>
+    <string name="whitelist_protect_chip">加入白名单保护</string>
+    <string name="whitelist_default_badge">内置受保护名称</string>
+    <string name="choose_artist">选择艺术家</string>
+    <string name="parsed_artists_preview">识别到的艺术家</string>
+    <string name="parsed_genres_preview">识别到的流派</string>
+
+    <string name="performance_profile_title">性能与低资源模式</string>
+    <string name="performance_profile_desc">针对入门级或老旧设备深度优化 CPU、内存与 GPU 占用</string>
+    <string name="perf_mode_auto">自动</string>
+    <string name="perf_mode_ultra_saver">极致省电/低存</string>
+    <string name="perf_mode_light">轻量模式</string>
+    <string name="perf_mode_full">完整特效</string>
+    <string name="perf_mode_auto_hint">自动检测入门 CPU、低内存或老旧显卡并关闭重度模糊，同时保持 100% 无损音质</string>
+
+    <string name="adaptive_ui_section">屏幕自适应与界面密度</string>
+    <string name="ui_density_title">界面密度</string>
+    <string name="ui_density_compact">紧凑</string>
+    <string name="ui_density_standard">标准</string>
+    <string name="ui_density_comfortable">宽松</string>
+    <string name="ui_font_scale_title">文字缩放</string>
+    <string name="grid_columns_title">网格列数</string>
+    <string name="grid_columns_auto">自动</string>
+    <string name="grid_columns_desc">根据屏幕尺寸自动调整列数，或锁定固定列数</string>
+    <string name="ui_density_desc">为任意屏幕分辨率调整间距与卡片紧凑度</string>
+    <string name="ui_density_spacious">宽松</string>
+    <string name="replaygain_mode_title">响度均衡模式</string>
+    <string name="replaygain_mode_desc">利用 ReplayGain/R128 标签或轻量 RMS/LUFS 实时分析保持统一音量</string>
+    <string name="replaygain_rms_fallback">实时 LUFS / RMS 响度分析</string>
+    <string name="replaygain_rms_fallback_desc">为缺少 ReplayGain/R128 标签的曲目实时计算 K 加权 LUFS 与峰值增益</string>
+    <string name="replaygain_badge_player">在播放器中显示 ReplayGain / LUFS dB 徽章</string>
+    <string name="gapless_playback">真无缝播放 (Gapless)</string>
+    <string name="gapless_playback_desc">曲目间采样级零间隙平滑切换</string>
+    <string name="gapless_smart_album">连续播放专辑时保持无缝衔接</string>
+    <string name="gapless_smart_album_desc">顺序播放同一专辑曲目时自动绕过交叉淡化</string>
+    <string name="extended_formats_title">扩展音频与多声道格式</string>
+    <string name="extended_formats_desc">Android 与 PC 全平台兼容：ALAC、AIFF/AIF、APE、WavPack (WV)、DSD (DSF/DFF)、M4A、MP4、MKV/MKA、WebM、Opus（立体声与 5.1/7.1）、E-AC3、AC-3、AC-4、DTS、WMA、CAF、FLAC、WAV、OGG、AAC、MP3</string>
+    <string name="multitag_section">多艺术家、多流派与白名单</string>
+    <string name="multitag_separators_title">启用的分隔符</string>
+    <string name="whitelist_manage">受保护白名单（永不拆分）</string>
+    <string name="whitelist_manage_desc">此列表中的艺术家和流派（如 AC/DC、Tyler, The Creator、R&amp;B）绝不会被分隔符拆分</string>
+    <string name="whitelist_add_hint">添加艺术家或流派（如 Wisin &amp; Yandel）</string>
+    <string name="whitelist_add_button">添加到白名单</string>
+    <string name="whitelist_defaults_info">内置受保护名称</string>
+    <string name="whitelist_added_toast">已在白名单中保护“%1$s”</string>
+    <string name="perf_mode_ultra_saver_desc">极低内存占用，零 GPU 模糊与动画，专为 1–2 核老旧设备打造</string>
+    <string name="perf_mode_light_desc">关闭实时模糊着色器与持续动画，实现流畅 60 帧</string>
+    <string name="perf_mode_full_desc">启用全部视觉特效、动态模糊与过渡动画</string>
+    <string name="fork_attribution_title">基于 Lune 的开源分支 (Fork)</string>
+    <string name="fork_attribution_desc">Flow 是基于 MrDemonc 创建的 Lune (https://github.com/MrDemonc/Lune) 打造的跨平台（Android、Windows 与 Linux）发烧级音乐播放器分支，遵循 GPLv3 协议，针对超低内存/CPU 占用、实时 LUFS 响度均衡、无缝播放及扩展音频格式进行了深度优化。</string>
+    <string name="fork_open_original_repo">访问原始 Lune 仓库 (GitHub)</string>
+    <string name="analyze_library_lufs">分析曲库响度 (LUFS)</string>
+    <string name="analyze_library_lufs_desc">在后台为无标签曲目预先计算 ITU-R BS.1770 LUFS 响度增益</string>
+    <string name="analyzing_library_progress">正在分析 LUFS 响度：%1$d / %2$d 首…</string>
+    <string name="library_scan_progress">正在索引曲库与扩展格式（%1$d 首）…</string>
 </resources>

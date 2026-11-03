@@ -1,5 +1,7 @@
 package com.demonlab.lune.desktop
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,17 +51,17 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         state = windowState,
-        title = "Lune Music Player"
+        title = "Flow Music Player"
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
-            LuneDesktopApp()
+            FlowDesktopApp()
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun LuneDesktopApp() {
+fun FlowDesktopApp() {
     val scope = rememberCoroutineScope()
     val engine = remember { DesktopAudioEngine(scope) }
 
@@ -69,6 +71,7 @@ fun LuneDesktopApp() {
     val isPlaying by engine.isPlaying.collectAsState()
     val progress by engine.progress.collectAsState()
     val isScanning by engine.isScanning.collectAsState()
+    val scanStatus by engine.scanStatus.collectAsState()
 
     var songs by remember { mutableStateOf<List<DesktopSong>>(emptyList()) }
     var activeTab by remember { mutableStateOf(DesktopTab.TRACKS) }
@@ -268,7 +271,7 @@ fun LuneDesktopApp() {
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "Lune",
+                                text = "Flow",
                                 style = if (isCompactWidth) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -303,12 +306,12 @@ fun LuneDesktopApp() {
                             }
                         }
 
-                        if (isScanning) {
+                        if (isScanning || scanStatus.isNotBlank()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Escaneando biblioteca con caché incremental...",
+                                text = scanStatus.ifBlank { "Escaneando biblioteca con caché incremental..." },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (isScanning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -348,7 +351,12 @@ fun LuneDesktopApp() {
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            when (activeTab) {
+                            Crossfade(
+                                targetState = activeTab,
+                                animationSpec = tween(durationMillis = if (engine.isLowResourceActive) 0 else 140),
+                                label = "flow_desktop_tab_fade"
+                            ) { tab ->
+                            when (tab) {
                                 DesktopTab.TRACKS -> {
                                     LazyColumn(
                                         modifier = Modifier.fillMaxSize(),
@@ -551,12 +559,14 @@ fun LuneDesktopApp() {
                                     DesktopSettingsPanel(
                                         settings = settings,
                                         engine = engine,
+                                        songs = songs,
                                         outputDevices = outputDevices,
                                         newWhitelistInput = newWhitelistInput,
                                         onNewWhitelistInputChange = { newWhitelistInput = it },
                                         onUpdateSettings = ::updateSettings
                                     )
                                 }
+                            }
                             }
                         }
 
@@ -749,6 +759,7 @@ fun LuneDesktopApp() {
 private fun DesktopSettingsPanel(
     settings: DesktopSettings,
     engine: DesktopAudioEngine,
+    songs: List<DesktopSong>,
     outputDevices: List<AudioOutputDevice>,
     newWhitelistInput: String,
     onNewWhitelistInputChange: (String) -> Unit,
@@ -816,6 +827,13 @@ private fun DesktopSettingsPanel(
                         Text("Limitador Anti-Clipping")
                     }
                 }
+                OutlinedButton(
+                    onClick = { engine.analyzeUntaggedTracksInBackground(songs) }
+                ) {
+                    Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Analizar sonoridad LUFS K-Weighted en pistas sin etiquetas")
+                }
             }
         }
 
@@ -824,9 +842,9 @@ private fun DesktopSettingsPanel(
                 Text("Audio Gapless, Formatos Extendidos y Salida de Audio", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     text = if (engine.hasFfmpegAvailable) {
-                        "Decodificador FFmpeg SSE2 detectado: soporte nativo para ALAC, AIFF, MKV, MKA, MP4, Opus 5.1/7.1, EAC3, AC4, FLAC, APE y WavPack."
+                        "Decodificadores FFmpeg SSE2 + Nativo PCM/DSD activos: reproducción verificada de ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (estéreo y 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC y MP3."
                     } else {
-                        "Modo puro JavaSound activo (instala 'ffmpeg' en el sistema para activar ALAC, MKV, Opus multicanal, EAC3 y AC4)."
+                        "Decodificador Nativo PCM/DSD + JavaSound activo (WAV, AIFF/AIF, CAF, DSF/DFF DSD, AU). Instala 'ffmpeg' en tu sistema para habilitar ALAC, APE, WavPack, MKV/MKA, WebM, Opus 5.1/7.1, E-AC3, AC-3, AC-4, DTS y WMA."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -979,6 +997,34 @@ private fun DesktopSettingsPanel(
                     onValueChange = { onUpdateSettings(settings.copy(uiFontScale = (it * 20f).roundToInt() / 20f), false) },
                     valueRange = 0.85f..1.25f
                 )
+            }
+        }
+
+        Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Acerca de Flow (Fork de Lune)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Flow v2.0.0 — Reproductor audiófilo multiplataforma ultraligero (< 180 MB RAM en PC) para Android, Windows y Linux.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Flow es un fork de código abierto (GPLv3) basado en Lune por MrDemonc (https://github.com/MrDemonc/Lune), rediseñado con normalización LUFS K-Weighted en tiempo real, motor Gapless, soporte extendido de 23+ formatos y optimización extrema para hardware modesto.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = {
+                        runCatching {
+                            if (java.awt.Desktop.isDesktopSupported()) {
+                                java.awt.Desktop.getDesktop().browse(java.net.URI("https://github.com/MrDemonc/Lune"))
+                            }
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Proyecto original Lune en GitHub (MrDemonc/Lune)")
+                }
             }
         }
     }

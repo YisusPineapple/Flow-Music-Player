@@ -103,6 +103,16 @@ fun Modifier.bounceClick(
     dampingRatio: Float = Spring.DampingRatioMediumBouncy,
     stiffness: Float = Spring.StiffnessMedium
 ): Modifier = composed {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val settingsManager = remember(context) { com.demonlab.lune.tools.SettingsManager.getInstance(context) }
+    val ultraSaver = remember(context, settingsManager.performanceProfile) {
+        settingsManager.isUltraSaverActive(context)
+    }
+    if (ultraSaver) return@composed this
+
+    val lowResource = remember(context, settingsManager.performanceProfile) {
+        settingsManager.isLowResourceVisualsActive(context)
+    }
     val scale = remember { Animatable(1f) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -111,13 +121,13 @@ fun Modifier.bounceClick(
             scaleX = scale.value
             scaleY = scale.value
         }
-        .pointerInput(scaleDown, dampingRatio, stiffness) {
+        .pointerInput(scaleDown, dampingRatio, stiffness, lowResource) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 val animJob = coroutineScope.launch {
                     scale.animateTo(
                         targetValue = scaleDown,
-                        animationSpec = spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        animationSpec = if (lowResource) tween(durationMillis = 80) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
                     )
                 }
                 waitForUpOrCancellation()
@@ -125,7 +135,7 @@ fun Modifier.bounceClick(
                 coroutineScope.launch {
                     scale.animateTo(
                         targetValue = 1f,
-                        animationSpec = spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        animationSpec = if (lowResource) tween(durationMillis = 100) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
                     )
                 }
             }

@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Lune"
+rootProject.name = "Flow"
 include(":app")
 
 if (providers.gradleProperty("enableDesktop").orNull == "true") {

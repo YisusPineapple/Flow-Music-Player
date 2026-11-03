@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">Configuración</string>
     <string name="about">Acerca de</string>
     <string name="version">Versión</string>
@@ -55,7 +55,7 @@
     <string name="tab_genres">Géneros</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">Lune AI Core</string>
+    <string name="ai_core_title">Flow AI Core</string>
     <string name="ai_musical_intelligence">Inteligencia Musical</string>
     <string name="ai_local_learning_desc">Aprendizaje 100% local y privado</string>
     <string name="ai_affinity_flow">Flujo y afinidad de biblioteca</string>
@@ -269,7 +269,7 @@
     <string name="visualizer_mini_player">Mostrar en mini reproductor</string>
     <string name="credits">Créditos</string>
     <string name="credits_desc">Pruebas, sugerencias de diseño y logo</string>
-    <string name="creator_desc">Creador y mantenedor de lune music player</string>
+    <string name="creator_desc">Creador original de Lune Music Player (proyecto base de Flow)</string>
     <string name="gesture">Gestos</string>
     <string name="gesture_desc">Configuracion de gestos</string>
     <string name="enable_gestures">Activar gestos</string>
@@ -332,7 +332,7 @@
     <string name="filter_scope_albums">Álbumes</string>
     <string name="filter_all_albums">Todos los álbumes</string>
     <string name="backup_warning_title">Aviso Importante</string>
-    <string name="backup_warning_desc">Lune solo importa listas pre-exportadas por esta aplicación. Asegúrate de tener los archivos de música correspondientes en este dispositivo para una correcta reproducción.</string>
+    <string name="backup_warning_desc">Flow importa listas exportadas por Flow o Lune. Asegúrate de tener los archivos de música correspondientes en este dispositivo para una correcta reproducción.</string>
     <string name="export_playlists">Exportar Listas</string>
     <string name="export_playlists_desc">Guardar tus listas en un archivo</string>
     <string name="import_playlists">Importar Listas</string>
@@ -379,8 +379,8 @@
     <string name="onboarding_perm_music_title">Música y Archivos</string>
     <string name="onboarding_perm_music_desc">Esencial para escanear, indexar y reproducir tu colección de música almacenada en este dispositivo.</string>
     <string name="onboarding_perm_manage_files_title">Acceso a la carpeta de música</string>
-    <string name="onboarding_perm_manage_files_desc">Selecciona tu carpeta de música para permitir que Lune organice y gestione tu biblioteca de forma segura.</string>
-    <string name="onboarding_welcome_back">Bienvenido a Lune</string>
+    <string name="onboarding_perm_manage_files_desc">Selecciona tu carpeta de música para permitir que Flow organice y gestione tu biblioteca de forma segura.</string>
+    <string name="onboarding_welcome_back">Bienvenido a Flow</string>
     <string name="onboarding_listen_style">Escucha con estilo</string>
     <string name="onboarding_feature_hifi">Soporte de audio HiFi</string>
 
@@ -394,10 +394,10 @@
     <string name="onboarding_reminder_desc">Si omitiste algún permiso, puedes activarlo fácilmente más tarde en Ajustes > Seguridad > Permisos.</string>
     <string name="onboarding_reminder_button">Entendido</string>
     <string name="onboarding_folder_visibility_title">Visibilidad de Carpetas</string>
-    <string name="onboarding_folder_visibility_desc">Por defecto, Lune solo mostrará canciones de la carpeta de música seleccionada. Activa esta opción para mostrar todas las carpetas de música desde el inicio.</string>
+    <string name="onboarding_folder_visibility_desc">Por defecto, Flow solo mostrará canciones de la carpeta de música seleccionada. Activa esta opción para mostrar todas las carpetas de música desde el inicio.</string>
     <string name="onboarding_folder_visibility_label">Mostrar todas las carpetas</string>
     <string name="onboarding_support_title">Apoya el Proyecto</string>
-    <string name="onboarding_support_desc">Si disfrutas Lune, considera apoyarnos en la sección Donar en Ajustes > Acerca de. ¡Cada contribución ayuda a que la app siga creciendo!</string>
+    <string name="onboarding_support_desc">Flow es un fork de código abierto de Lune. ¡Considera apoyar al proyecto original en Ajustes > Acerca de!</string>
     <string name="search_play_all">Reproducir</string>
     <string name="search_shuffle">Aleatorio</string>
     <string name="playing_from">Sonando desde: %s</string>
@@ -456,9 +456,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">Reproducción rápida</string>
-    <string name="open_in_lune">Abrir en Lune</string>
+    <string name="open_in_lune">Abrir en Flow</string>
     <string name="close">Cerrar</string>
-    <string name="cd_open_in_lune">Abrir en Lune</string>
+    <string name="cd_open_in_lune">Abrir en Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">Editar letra</string>
@@ -501,7 +501,7 @@
     <string name="remove_playlist_cover">Restaurar portada</string>
     <string name="playlist_cover_updated">Portada de lista actualizada</string>
     <string name="metadata_saved_file">Metadatos guardados directamente en el archivo</string>
-    <string name="metadata_saved_local_fallback">Guardado localmente en Lune (archivo de solo lectura)</string>
+    <string name="metadata_saved_local_fallback">Guardado localmente en Flow (archivo de solo lectura)</string>
     <string name="metadata_permission_needed">Concede permiso para guardar etiquetas en el archivo</string>
 
     <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
@@ -525,7 +525,7 @@
     <string name="gapless_audio_desc">Transiciones continuas sin silencios ni cortes entre pistas</string>
     <string name="gapless_album_priority">Priorizar Gapless en Álbumes Continuos</string>
     <string name="gapless_album_priority_desc">Usa Gapless automáticamente en vez de Crossfade al reproducir pistas consecutivas del mismo álbum</string>
-    <string name="extended_formats_supported">Formatos soportados: ALAC, AIFF, FLAC, WAV, APE, WavPack, DSD, M4A, MP4, MKV/MKA, WebM, Opus (Estéreo y 5.1/7.1), E-AC3, AC-4, OGG, MP3</string>
+    <string name="extended_formats_supported">Formatos soportados: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Estéreo y 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
 
     <string name="multitag_title">Multi-Artistas, Multi-Géneros y Lista Blanca</string>
     <string name="multitag_desc">Configura separadores, extracción de ft. en títulos y nombres protegidos</string>
@@ -535,7 +535,7 @@
     <string name="enable_multi_genre_desc">Permite que una canción pertenezca a varios géneros a la vez</string>
     <string name="split_semicolon">Punto y coma (;)</string>
     <string name="split_comma">Coma (,)</string>
-    <string name="split_slash">Barra (/ | \)</string>
+    <string name="split_slash">Barra (/ | \\)</string>
     <string name="split_ampersand">Ampersand (&amp;)</string>
     <string name="split_feat_keywords">Conectores (ft., feat., con, with, vs., x)</string>
     <string name="extract_artists_from_title">Extraer colaboradores del título</string>
@@ -573,15 +573,15 @@
     <string name="ui_density_spacious">Amplia</string>
     <string name="replaygain_mode_title">Modo de Normalización</string>
     <string name="replaygain_mode_desc">Mantiene un volumen consistente usando etiquetas ReplayGain/R128 o análisis ligero RMS/LUFS</string>
-    <string name="replaygain_rms_fallback">Análisis Ligero RMS/LUFS</string>
-    <string name="replaygain_rms_fallback_desc">Analiza canciones sin etiquetas con muestreo PCM disperso de muy bajo consumo</string>
-    <string name="replaygain_badge_player">Mostrar insignia ReplayGain (dB) en el reproductor</string>
+    <string name="replaygain_rms_fallback">Análisis LUFS / RMS en Tiempo Real</string>
+    <string name="replaygain_rms_fallback_desc">Calcula sonoridad LUFS con ponderación K y pico en tiempo real para pistas sin etiquetas ReplayGain/R128</string>
+    <string name="replaygain_badge_player">Mostrar insignia ReplayGain / LUFS (dB) en el reproductor</string>
     <string name="gapless_playback">Reproducción Gapless Real</string>
     <string name="gapless_playback_desc">Transiciones exactas sin silencios ni cortes entre canciones</string>
     <string name="gapless_smart_album">Respetar Gapless en Álbumes Continuos</string>
     <string name="gapless_smart_album_desc">Omite el Crossfade automáticamente al reproducir pistas consecutivas de un mismo álbum</string>
     <string name="extended_formats_title">Formatos Extendidos y Multicanal</string>
-    <string name="extended_formats_desc">Soporte nativo para ALAC, AIFF, FLAC, WAV, APE, WavPack, DSD, M4A, MP4, MKV/MKA, WebM, Opus (Estéreo y 5.1/7.1), E-AC3 y AC-4</string>
+    <string name="extended_formats_desc">Compatible en Android y PC: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Estéreo y 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC y MP3</string>
     <string name="multitag_section">Multi-Artistas, Multi-Géneros y Lista Blanca</string>
     <string name="multitag_separators_title">Separadores Activos</string>
     <string name="whitelist_manage">Lista Blanca Protegida (No separar)</string>
@@ -593,4 +593,11 @@
     <string name="perf_mode_ultra_saver_desc">Mínima RAM y cero desenfoques/animaciones continuas para equipos muy modestos</string>
     <string name="perf_mode_light_desc">Desactiva shaders de desenfoque pesados y bucles continuos para máxima fluidez</string>
     <string name="perf_mode_full_desc">Activa todos los efectos visuales, desenfoques dinámicos y animaciones</string>
+    <string name="fork_attribution_title">Fork de Código Abierto de Lune</string>
+    <string name="fork_attribution_desc">Flow es un fork audiófilo multiplataforma (Android, Windows y Linux) de Lune (https://github.com/MrDemonc/Lune) creado originalmente por MrDemonc, optimizado para consumo ultrabajo de RAM/CPU, normalización LUFS en tiempo real, reproducción Gapless y formatos extendidos bajo licencia GPLv3.</string>
+    <string name="fork_open_original_repo">Repositorio original de Lune (GitHub)</string>
+    <string name="analyze_library_lufs">Analizar sonoridad de biblioteca (LUFS)</string>
+    <string name="analyze_library_lufs_desc">Precalcula ganancia LUFS ITU-R BS.1770 en segundo plano para pistas sin etiquetas</string>
+    <string name="analyzing_library_progress">Analizando sonoridad LUFS: %1$d / %2$d pistas…</string>
+    <string name="library_scan_progress">Indexando biblioteca y códecs extendidos (%1$d pistas)…</string>
 </resources>

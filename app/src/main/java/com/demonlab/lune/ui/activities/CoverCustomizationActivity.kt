@@ -245,7 +245,7 @@ fun CoverCustomizationScreen(
                                 color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                "Lune MrDemonc",
+                                "Flow Audio",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )

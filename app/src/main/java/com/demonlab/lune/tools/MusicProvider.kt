@@ -25,6 +25,22 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import com.demonlab.lune.audio.ReplayGainScanner
+import com.demonlab.lune.core.format.NativePcmContainerDecoder
+import com.demonlab.lune.core.format.SeekableByteReader
+import java.io.RandomAccessFile
+
+data class LibraryScanProgress(
+    val isScanning: Boolean = false,
+    val discoveredCount: Int = 0,
+    val cachedReusedCount: Int = 0,
+    val newlyParsedCount: Int = 0,
+    val phase: String = ""
+)
+
 class UriTypeAdapter : TypeAdapter<Uri>() {
     override fun write(out: JsonWriter, value: Uri?) {
         if (value == null) {
@@ -39,11 +55,16 @@ class UriTypeAdapter : TypeAdapter<Uri>() {
             reader.nextNull()
             return null
         }
-        return reader.nextString().toUri() // Modern KTX string-to-Uri converter
+        return reader.nextString().toUri()
     }
 }
 
 class MusicProvider(private val context: Context) {
+    companion object {
+        private val _scanProgress = MutableStateFlow(LibraryScanProgress())
+        val scanProgress: StateFlow<LibraryScanProgress> = _scanProgress.asStateFlow()
+    }
+
     private val settingsManager = SettingsManager.getInstance(context)
     private val database = MusicDatabase.getDatabase(context)
 
@@ -56,9 +77,10 @@ class MusicProvider(private val context: Context) {
     fun getCachedSongs(): List<Song> {
         if (!cacheFile.exists()) return emptyList()
         return try {
-            val json = cacheFile.readText()
             val type = object : TypeToken<List<Song>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            cacheFile.bufferedReader(Charsets.UTF_8, 16 * 1024).use { reader ->
+                gson.fromJson<List<Song>>(reader, type) ?: emptyList()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -67,8 +89,14 @@ class MusicProvider(private val context: Context) {
 
     private fun saveToCache(songs: List<Song>) {
         try {
-            val json = gson.toJson(songs)
-            cacheFile.writeText(json)
+            val tmpFile = File(context.filesDir, "songs_cache.json.tmp")
+            tmpFile.bufferedWriter(Charsets.UTF_8, 16 * 1024).use { writer ->
+                gson.toJson(songs, writer)
+            }
+            if (!tmpFile.renameTo(cacheFile)) {
+                tmpFile.copyTo(cacheFile, overwrite = true)
+                tmpFile.delete()
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -97,6 +125,9 @@ class MusicProvider(private val context: Context) {
 
     suspend fun syncSongs(): List<Song> = withContext(Dispatchers.IO) {
         if (!hasReadPermission()) return@withContext emptyList()
+        var reusedCount = 0
+        var newlyParsed = 0
+        _scanProgress.value = LibraryScanProgress(isScanning = true, phase = "MediaStore")
         val songList = mutableListOf<Song>()
 
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -206,6 +237,7 @@ class MusicProvider(private val context: Context) {
                     cachedSong.channels != null
 
                 if (canReuseCachedHeader && cachedSong != null) {
+                    reusedCount++
                     sampleRate = cachedSong.sampleRate
                     bitDepth = cachedSong.bitDepth
                     isHiRes = cachedSong.isHiRes
@@ -231,6 +263,7 @@ class MusicProvider(private val context: Context) {
                         }
                     }
                 } else {
+                    newlyParsed++
                     val file = File(data)
                     if (bitrate == null && duration > 0 && file.exists()) {
                         bitrate = ((file.length() * 8) / (duration / 1000f)).toInt()
@@ -368,13 +401,70 @@ class MusicProvider(private val context: Context) {
                         channels = channels
                     )
                 )
+                if (songList.size % 60 == 0) {
+                    _scanProgress.value = LibraryScanProgress(
+                        isScanning = true,
+                        discoveredCount = songList.size,
+                        cachedReusedCount = reusedCount,
+                        newlyParsedCount = newlyParsed,
+                        phase = "MediaStore"
+                    )
+                }
             }
         }
 
-        // Supplementary lightweight scan for extended audio & containers (ALAC, AIFF, MKV, MKA, WebM, EAC3, AC4, APE, WV, DSF)
-        // that Android's MediaStore IS_MUSIC filter omits on many ROMs.
-        val indexedPaths = songList.mapTo(HashSet(songList.size * 2)) { it.path }
+        // Supplementary fast MediaStore.Files + folder scan for extended audio & containers
+        // (ALAC, AIFF, AIF, APE, WV, DSF, DFF, MKV, MKA, WebM, EAC3, AC3, AC4, DTS, WMA, CAF)
+        _scanProgress.value = LibraryScanProgress(
+            isScanning = true,
+            discoveredCount = songList.size,
+            cachedReusedCount = reusedCount,
+            newlyParsedCount = newlyParsed,
+            phase = "ExtendedFormats"
+        )
+        val indexedPaths = songList.mapTo(HashSet((songList.size * 2).coerceAtLeast(32))) { it.path }
         val existingByPath = existingById.values.associateBy { it.path }
+
+        // 1. Fast MediaStore.Files query for audiophile extensions across storage
+        runCatching {
+            val filesUri = MediaStore.Files.getContentUri("external")
+            val extSuffixes = listOf(
+                ".alac", ".aiff", ".aif", ".aifc", ".ape", ".wv",
+                ".dsf", ".dff", ".mka", ".mkv", ".webm",
+                ".eac3", ".ec3", ".ac3", ".ac4", ".dts", ".wma", ".caf"
+            )
+            val whereClause = extSuffixes.joinToString(" OR ") { "LOWER(${MediaStore.Files.FileColumns.DATA}) LIKE ?" }
+            val whereArgs = extSuffixes.map { "%$it" }.toTypedArray()
+            context.contentResolver.query(
+                filesUri,
+                arrayOf(MediaStore.Files.FileColumns.DATA),
+                whereClause,
+                whereArgs,
+                null
+            )?.use { fCursor ->
+                val pCol = fCursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
+                while (fCursor.moveToNext()) {
+                    val path = if (pCol != -1) fCursor.getString(pCol) else null
+                    if (path.isNullOrBlank() || path in indexedPaths) continue
+                    val file = File(path)
+                    if (!file.exists() || !file.isFile || file.length() <= 16384L) continue
+                    indexedPaths.add(path)
+                    val syntheticId = -(path.hashCode().toLong() and 0x7FFFFFFFL) - 10_000L
+                    val cachedExtra = existingByPath[path] ?: existingById[syntheticId]
+                    val lastSec = file.lastModified() / 1000L
+                    if (cachedExtra != null && cachedExtra.dateAdded == lastSec) {
+                        reusedCount++
+                        val ov = overrides[cachedExtra.id]
+                        songList.add(applyOverrideToCached(cachedExtra, ov))
+                    } else {
+                        newlyParsed++
+                        buildDirectFileSong(file, syntheticId, overrides[syntheticId])?.let { songList.add(it) }
+                    }
+                }
+            }
+        }
+
+        // 2. Shallow folder walk for non-MediaStore files in Music / Downloads / Custom folder
         val candidateDirs = linkedSetOf<File>()
         runCatching {
             val mDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
@@ -408,31 +498,49 @@ class MusicProvider(private val context: Context) {
                         val cachedExtra = existingByPath[absPath] ?: existingById[syntheticId]
                         val lastSec = file.lastModified() / 1000L
                         if (cachedExtra != null && cachedExtra.dateAdded == lastSec) {
+                            reusedCount++
                             val ov = overrides[cachedExtra.id]
-                            songList.add(
-                                if (ov != null) {
-                                    cachedExtra.copy(
-                                        title = ov.title?.takeIf { it.isNotBlank() } ?: cachedExtra.title,
-                                        artist = ov.artist?.takeIf { it.isNotBlank() } ?: cachedExtra.artist,
-                                        album = ov.album?.takeIf { it.isNotBlank() } ?: cachedExtra.album,
-                                        genre = ov.genre?.takeIf { it.isNotBlank() } ?: cachedExtra.genre,
-                                        coverUrl = ov.coverUri,
-                                        isFavorite = ov.isFavorite
-                                    )
-                                } else cachedExtra
-                            )
+                            songList.add(applyOverrideToCached(cachedExtra, ov))
                         } else {
-                            val built = buildDirectFileSong(file, syntheticId, overrides[syntheticId])
-                            if (built != null) {
-                                songList.add(built)
-                            }
+                            newlyParsed++
+                            buildDirectFileSong(file, syntheticId, overrides[syntheticId])?.let { songList.add(it) }
                         }
                     }
             }
         }
 
         saveToCache(songList)
+        _scanProgress.value = LibraryScanProgress(
+            isScanning = false,
+            discoveredCount = songList.size,
+            cachedReusedCount = reusedCount,
+            newlyParsedCount = newlyParsed,
+            phase = "Completed"
+        )
+
+        if (settingsManager.replayGainMode != 0 && settingsManager.replayGainFallbackAnalysis) {
+            ReplayGainScanner.analyzeLibraryUntaggedInBackground(
+                context = context,
+                songs = songList,
+                maxTracksPerPass = if (settingsManager.isLowResourceVisualsActive(context)) 40 else 150
+            )
+        }
         songList
+    }
+
+    private fun applyOverrideToCached(
+        cachedExtra: Song,
+        ov: com.demonlab.lune.data.SongOverride?
+    ): Song {
+        if (ov == null) return cachedExtra
+        return cachedExtra.copy(
+            title = ov.title?.takeIf { it.isNotBlank() } ?: cachedExtra.title,
+            artist = ov.artist?.takeIf { it.isNotBlank() } ?: cachedExtra.artist,
+            album = ov.album?.takeIf { it.isNotBlank() } ?: cachedExtra.album,
+            genre = ov.genre?.takeIf { it.isNotBlank() } ?: cachedExtra.genre,
+            coverUrl = ov.coverUri,
+            isFavorite = ov.isFavorite
+        )
     }
 
     private fun buildDirectFileSong(
@@ -494,6 +602,31 @@ class MusicProvider(private val context: Context) {
                 if (genres.isNotEmpty()) genre = CharsetUtils.sanitizeText(genres.joinToString("; "))
                 t.getFirst(org.jaudiotagger.tag.FieldKey.TITLE)?.takeIf { it.isNotBlank() }?.let { title = CharsetUtils.sanitizeText(it) }
                 t.getFirst(org.jaudiotagger.tag.FieldKey.ALBUM)?.takeIf { it.isNotBlank() }?.let { album = CharsetUtils.sanitizeText(it) }
+            }
+        }
+
+        // Native pure-Kotlin header fallback for AIFF, AIFC, CAF, DSF, DFF, AU
+        if ((durationMs <= 0L || sampleRate == null) && NativePcmContainerDecoder.isNativelyDecodableExtension(ext)) {
+            runCatching {
+                val raf = RandomAccessFile(file, "r")
+                val reader = object : SeekableByteReader {
+                    override val length: Long get() = raf.length()
+                    override var position: Long
+                        get() = raf.filePointer
+                        set(value) { raf.seek(value.coerceAtLeast(0L)) }
+                    override fun read(buffer: ByteArray, offset: Int, count: Int): Int = raf.read(buffer, offset, count)
+                    override fun close() = raf.close()
+                }
+                val stream = NativePcmContainerDecoder.open(reader)
+                if (stream != null) {
+                    if (durationMs <= 0L && stream.durationMs > 0L) durationMs = stream.durationMs
+                    if (sampleRate == null) sampleRate = stream.sourceSampleRate
+                    if (bitDepth == null) bitDepth = if (ext == "dsf" || ext == "dff") 1 else 16
+                    channels = stream.sourceChannels.coerceIn(1, 16)
+                    stream.close()
+                } else {
+                    raf.close()
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">Paramètres</string>
     <string name="about">À propos</string>
     <string name="version">Version</string>
@@ -55,7 +55,7 @@
     <string name="tab_genres">Genres</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">Lune AI Core</string>
+    <string name="ai_core_title">Flow AI Core</string>
     <string name="ai_musical_intelligence">Intelligence Musicale</string>
     <string name="ai_local_learning_desc">Apprentissage 100% hors ligne et privé</string>
     <string name="ai_affinity_flow">Affinité et fluidité de la bibliothèque</string>
@@ -265,7 +265,7 @@
     <string name="visualizer_mini_player">Afficher dans le mini lecteur</string>
     <string name="credits">Crédits</string>
     <string name="credits_desc">Tests, suggestions de design et logo</string>
-    <string name="creator_desc">Créateur et mainteneur du lecteur Lune Music</string>
+    <string name="creator_desc">Créateur original du lecteur Lune Music (base open source de Flow)</string>
     <string name="gesture">Gestes</string>
     <string name="gesture_desc">Configuration des gestes</string>
     <string name="enable_gestures">Activer les gestes</string>
@@ -322,7 +322,7 @@
     <string name="sort_duration">Durée</string>
     <string name="sort_date_added">Date d\'ajout</string>
     <string name="backup_warning_title">Avis Important</string>
-    <string name="backup_warning_desc">Lune importe uniquement les listes pré-exportées par cette application. Assurez-vous d\'avoir les fichiers musicaux correspondants sur cet appareil pour une lecture correcte.</string>
+    <string name="backup_warning_desc">Flow importe les listes exportées par Flow ou Lune. Assurez-vous d\'avoir les fichiers musicaux correspondants sur cet appareil pour une lecture correcte.</string>
     <string name="export_playlists">Exporter les playlists</string>
     <string name="export_playlists_desc">Enregistrer vos playlists dans un fichier</string>
     <string name="import_playlists">Importer des playlists</string>
@@ -369,8 +369,8 @@
     <string name="onboarding_perm_music_title">Musique et fichiers</string>
     <string name="onboarding_perm_music_desc">Essentiel pour analyser, indexer et lire votre collection musicale stockée sur cet appareil.</string>
     <string name="onboarding_perm_manage_files_title">Accès au dossier musical</string>
-    <string name="onboarding_perm_manage_files_desc">Sélectionnez votre dossier musical pour permettre à Lune d’organiser et gérer votre bibliothèque en toute sécurité.</string>
-    <string name="onboarding_welcome_back">Bienvenue sur Lune</string>
+    <string name="onboarding_perm_manage_files_desc">Sélectionnez votre dossier musical pour permettre à Flow d’organiser et gérer votre bibliothèque en toute sécurité.</string>
+    <string name="onboarding_welcome_back">Bienvenue sur Flow</string>
     <string name="onboarding_listen_style">Écoutez avec style</string>
     <string name="onboarding_feature_hifi">Prise en charge audio HiFi</string>
 
@@ -384,10 +384,10 @@
     <string name="onboarding_reminder_desc">Si vous avez ignoré une permission, vous pourrez facilement l’activer plus tard dans Paramètres > Sécurité > Permissions.</string>
     <string name="onboarding_reminder_button">Compris</string>
     <string name="onboarding_folder_visibility_title">Visibilité des Dossiers</string>
-    <string name="onboarding_folder_visibility_desc">Par défaut, Lune n\'affichera que les morceaux du dossier sélectionné. Activez cette option pour afficher tous les dossiers musicaux dès le début.</string>
+    <string name="onboarding_folder_visibility_desc">Par défaut, Flow n\'affichera que les morceaux du dossier sélectionné. Activez cette option pour afficher tous les dossiers musicaux dès le début.</string>
     <string name="onboarding_folder_visibility_label">Afficher tous les dossiers</string>
     <string name="onboarding_support_title">Soutenez le Projet</string>
-    <string name="onboarding_support_desc">Si vous aimez Lune, pensez à nous soutenir via la section Faire un don dans Paramètres > À propos. Chaque contribution aide l\'application à continuer de grandir !</string>
+    <string name="onboarding_support_desc">Flow est un fork open source de Lune. Soutenez le projet original via Paramètres > À propos !</string>
     <string name="search_play_all">Lire</string>
     <string name="search_shuffle">Aléatoire</string>
     <string name="playing_from">Lecture depuis: %s</string>
@@ -437,9 +437,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">Lecture rapide</string>
-    <string name="open_in_lune">Ouvrir dans Lune</string>
+    <string name="open_in_lune">Ouvrir dans Flow</string>
     <string name="close">Fermer</string>
-    <string name="cd_open_in_lune">Ouvrir dans Lune</string>
+    <string name="cd_open_in_lune">Ouvrir dans Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">Modifier les paroles</string>
@@ -463,4 +463,121 @@
     <string name="auto_sync_backup">Sauvegarde synchronisée automatiquement</string>
     <string name="auto_sync_backup_desc">Met à jour automatiquement la sauvegarde exportée lors de modifications</string>
     <string name="auto_sync_requires_export">Exportez d\'abord une sauvegarde pour activer la synchronisation automatique</string>
+
+    <string name="adaptive_crossfade">Durée adaptative IA</string>
+    <string name="adaptive_crossfade_desc">Ajuster automatiquement la durée du fondu selon l\'énergie et le style</string>
+    <string name="crossfade_silence_detection">Détection des silences de fin</string>
+    <string name="crossfade_silence_detection_desc">Démarrer la transition plus tôt en cas de silence en fin de piste</string>
+    <string name="go_to_album">Aller à l\'album</string>
+    <string name="blacklist_song">Masquer la chanson (Liste noire)</string>
+    <string name="song_blacklisted_toast">Chanson masquée dans la liste noire</string>
+    <string name="manage_blacklist">Liste noire et éléments masqués</string>
+    <string name="manage_blacklist_desc">Gérer les chansons masquées et dossiers exclus</string>
+    <string name="blacklisted_songs">Chansons masquées</string>
+    <string name="blacklisted_folders">Dossiers masqués</string>
+    <string name="blacklist_empty"> aucun élément masqué</string>
+    <string name="restore_item">Restaurer</string>
+    <string name="change_playlist_cover">Changer la pochette</string>
+    <string name="remove_playlist_cover">Réinitialiser la pochette</string>
+    <string name="playlist_cover_updated">Pochette mise à jour</string>
+    <string name="metadata_saved_file">Tags enregistrés directement dans le fichier</string>
+    <string name="metadata_saved_local_fallback">Enregistré localement dans Flow (fichier en lecture seule)</string>
+    <string name="metadata_permission_needed">Accordez l\'accès au fichier pour sauvegarder les tags</string>
+
+    <string name="replaygain_section">ReplayGain &amp; Normalisation du Volume</string>
+    <string name="replaygain_desc">Maintenir un volume uniforme via les tags ReplayGain/R128 ou l\'analyse LUFS/RMS en temps réel</string>
+    <string name="replaygain_mode_off">Désactivé</string>
+    <string name="replaygain_mode_track">Par piste</string>
+    <string name="replaygain_mode_album">Par album</string>
+    <string name="replaygain_mode_smart">Album intelligent</string>
+    <string name="replaygain_preamp_tagged">Pré-ampli (Avec tags)</string>
+    <string name="replaygain_preamp_untagged">Pré-ampli (Sans tags)</string>
+    <string name="replaygain_fallback_analysis">Analyse LUFS / RMS en temps réel</string>
+    <string name="replaygain_fallback_analysis_desc">Calculer l\'intensité sonore pour les pistes sans tags ReplayGain/R128</string>
+    <string name="replaygain_prevent_clipping">Limiteur anti-saturation</string>
+    <string name="replaygain_prevent_clipping_desc">Limiter automatiquement le gain positif pour éviter l\'écrêtage</string>
+    <string name="show_replaygain_badge">Afficher le badge ReplayGain / LUFS</string>
+    <string name="show_replaygain_badge_desc">Afficher le gain dB actif dans le lecteur</string>
+    <string name="replaygain_mode_title">Mode de normalisation</string>
+    <string name="replaygain_mode_desc">Volume homogène via ReplayGain/R128 ou analyse LUFS/RMS légère</string>
+    <string name="replaygain_rms_fallback">Analyse LUFS / RMS en temps réel</string>
+    <string name="replaygain_rms_fallback_desc">Calculer le gain LUFS pondéré K en temps réel pour les pistes sans tags</string>
+    <string name="replaygain_badge_player">Afficher le badge ReplayGain / LUFS (dB) dans le lecteur</string>
+
+    <string name="gapless_section">Audio Gapless &amp; Codecs Étendus</string>
+    <string name="gapless_audio">Lecture Gapless réelle</string>
+    <string name="gapless_audio_desc">Transitions sans silence au sample près entre les pistes</string>
+    <string name="gapless_album_priority">Priorité Gapless sur les albums continus</string>
+    <string name="gapless_album_priority_desc">Utiliser Gapless au lieu du fondu sur les pistes consécutives d\'un même album</string>
+    <string name="gapless_playback">Lecture Gapless réelle</string>
+    <string name="gapless_playback_desc">Transitions exactes sans blanc entre les pistes</string>
+    <string name="gapless_smart_album">Respecter Gapless sur les albums continus</string>
+    <string name="gapless_smart_album_desc">Ignorer le fondu lors de la lecture séquentielle d\'un même album</string>
+    <string name="extended_formats_title">Formats Audio Étendus &amp; Multicanaux</string>
+    <string name="extended_formats_desc">Compatible Android &amp; PC : ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Stéréo &amp; 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
+    <string name="extended_formats_supported">Formats pris en charge : ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Stéréo &amp; 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
+
+    <string name="multitag_title">Multi-Artistes, Multi-Genres &amp; Liste Blanche</string>
+    <string name="multitag_section">Multi-Artistes, Multi-Genres &amp; Liste Blanche</string>
+    <string name="multitag_desc">Configurer les séparateurs, l\'extraction ft. du titre et les noms protégés</string>
+    <string name="multitag_separators_title">Séparateurs actifs</string>
+    <string name="enable_multi_artist">Indexation multi-artistes</string>
+    <string name="enable_multi_artist_desc">Afficher les collaborations sous chaque artiste individuel</string>
+    <string name="enable_multi_genre">Indexation multi-genres</string>
+    <string name="enable_multi_genre_desc">Associer une piste à plusieurs genres simultanément</string>
+    <string name="split_semicolon">Point-virgule (;)</string>
+    <string name="split_comma">Virgule (,)</string>
+    <string name="split_slash">Barre (/ | \\)</string>
+    <string name="split_ampersand">Esperluette (&amp;)</string>
+    <string name="split_feat_keywords">Connecteurs (ft., feat., con, with, vs., x)</string>
+    <string name="extract_artists_from_title">Extraire les artistes du titre</string>
+    <string name="extract_artists_from_title_desc">Détecter (ft. Artiste) ou [feat. Artiste] dans les titres sans conflit</string>
+    <string name="clean_feat_from_title">Masquer (ft. …) du titre affiché</string>
+    <string name="clean_feat_from_title_desc">Garder les titres propres tout en indexant les artistes invités</string>
+    <string name="whitelist_section">Liste Blanche Protégée (Ne jamais séparer)</string>
+    <string name="whitelist_manage">Liste Blanche Protégée</string>
+    <string name="whitelist_desc">Les noms comme AC/DC, Tyler, The Creator ou R&amp;B ne sont jamais séparés.</string>
+    <string name="whitelist_manage_desc">Les artistes et genres de cette liste ne sont jamais divisés</string>
+    <string name="whitelist_input_hint">Ajouter artiste ou genre (ex. Daft Punk)</string>
+    <string name="whitelist_add_hint">Ajouter artiste ou genre</string>
+    <string name="whitelist_add">Protéger</string>
+    <string name="whitelist_add_button">Ajouter à la liste blanche</string>
+    <string name="whitelist_protect_chip">Protéger en liste blanche</string>
+    <string name="whitelist_default_badge">Noms protégés intégrés</string>
+    <string name="whitelist_defaults_info">Noms protégés intégrés</string>
+    <string name="whitelist_added_toast">« %1$s » protégé en liste blanche</string>
+    <string name="choose_artist">Choisir l\'artiste</string>
+    <string name="parsed_artists_preview">Artistes détectés</string>
+    <string name="parsed_genres_preview">Genres détectés</string>
+
+    <string name="performance_profile_title">Mode Performance &amp; Ressources</string>
+    <string name="performance_profile_desc">Optimiser CPU, RAM et GPU pour les appareils modestes ou anciens</string>
+    <string name="perf_mode_auto">Auto</string>
+    <string name="perf_mode_ultra_saver">Ultra-Éco</string>
+    <string name="perf_mode_light">Léger</string>
+    <string name="perf_mode_full">Complet</string>
+    <string name="perf_mode_auto_hint">Détecte automatiquement les appareils modestes et désactive les flous lourds</string>
+    <string name="perf_mode_ultra_saver_desc">RAM minimale et zéro flou/animation continue pour appareils très modestes</string>
+    <string name="perf_mode_light_desc">Désactive les flous temps réel et boucles continues pour une fluidité maximale</string>
+    <string name="perf_mode_full_desc">Active tous les effets visuels, flous dynamiques et animations</string>
+
+    <string name="adaptive_ui_section">Adaptabilité d\'Écran &amp; Densité</string>
+    <string name="ui_density_title">Densité de l\'interface</string>
+    <string name="ui_density_desc">Ajuster l\'espacement pour toutes les tailles d\'écran</string>
+    <string name="ui_density_compact">Compacte</string>
+    <string name="ui_density_standard">Standard</string>
+    <string name="ui_density_comfortable">Spacieuse</string>
+    <string name="ui_density_spacious">Spacieuse</string>
+    <string name="ui_font_scale_title">Échelle du texte</string>
+    <string name="grid_columns_title">Colonnes de la grille</string>
+    <string name="grid_columns_auto">Auto</string>
+    <string name="grid_columns_desc">Colonnes automatiques selon l\'écran ou nombre fixe</string>
+
+    <string name="fork_attribution_title">Fork Open Source de Lune</string>
+    <string name="fork_attribution_desc">Flow est un fork audiophile multiplateforme (Android, Windows &amp; Linux) de Lune (https://github.com/MrDemonc/Lune) créé par MrDemonc, optimisé pour une faible empreinte RAM/CPU, la normalisation LUFS en temps réel, le Gapless et les formats étendus sous GPLv3.</string>
+    <string name="fork_open_original_repo">Dépôt original de Lune (GitHub)</string>
+    <string name="analyze_library_lufs">Analyser le volume de la bibliothèque (LUFS)</string>
+    <string name="analyze_library_lufs_desc">Pré-calculer le gain LUFS ITU-R BS.1770 en arrière-plan pour les pistes sans tags</string>
+    <string name="analyzing_library_progress">Analyse LUFS : %1$d / %2$d pistes…</string>
+    <string name="library_scan_progress">Indexation de la bibliothèque (%1$d pistes)…</string>
 </resources>

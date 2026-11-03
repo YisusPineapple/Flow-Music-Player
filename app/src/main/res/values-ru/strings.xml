@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">Настройки</string>
     <string name="about">О приложении</string>
     <string name="version">Версия</string>
@@ -55,7 +55,7 @@
     <string name="tab_genres">Жанры</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">Lune AI Core</string>
+    <string name="ai_core_title">Flow AI Core</string>
     <string name="ai_musical_intelligence">Музыкальный ИИ</string>
     <string name="ai_local_learning_desc">100% офлайн и приватное обучение</string>
     <string name="ai_affinity_flow">Гармония и предпочтения медиатеки</string>
@@ -265,7 +265,7 @@
     <string name="visualizer_mini_player">Показывать в мини-плеере</string>
     <string name="credits">Благодарности</string>
     <string name="credits_desc">Тестирование, дизайн и логотип</string>
-    <string name="creator_desc">Создатель и разработчик Lune Music Player</string>
+    <string name="creator_desc">Оригинальный создатель Lune Music Player (основа Flow)</string>
     <string name="gesture">Жесты</string>
     <string name="gesture_desc">Настройка жестов приложения</string>
     <string name="enable_gestures">Включить жесты</string>
@@ -322,7 +322,7 @@
     <string name="sort_duration">По продолжительности</string>
     <string name="sort_date_added">По дате добавления</string>
     <string name="backup_warning_title">Важное уведомление</string>
-    <string name="backup_warning_desc">Lune импортирует только плейлисты, ранее экспортированные этим приложением. Убедитесь, что соответствующие музыкальные файлы сохранены на устройстве для корректного воспроизведения.</string>
+    <string name="backup_warning_desc">Flow импортирует плейлисты, экспортированные этим приложением (включая резервные копии Lune). Убедитесь, что соответствующие музыкальные файлы сохранены на устройстве.</string>
     <string name="export_playlists">Экспорт плейлистов</string>
     <string name="export_playlists_desc">Сохранить ваши плейлисты в файл</string>
     <string name="import_playlists">Импорт плейлистов</string>
@@ -369,8 +369,8 @@
     <string name="onboarding_perm_music_title">Музыка &amp; Аудио</string>
     <string name="onboarding_perm_music_desc">Необходимо для сканирования, индексации и воспроизведения музыкальной коллекции на устройстве.</string>
     <string name="onboarding_perm_manage_files_title">Доступ к папке с музыкой</string>
-    <string name="onboarding_perm_manage_files_desc">Выберите папку с музыкой, чтобы Lune безопасно организовал вашу медиатеку</string>
-    <string name="onboarding_welcome_back">Добро пожаловать в Lune</string>
+    <string name="onboarding_perm_manage_files_desc">Выберите папку с музыкой, чтобы Flow безопасно организовал вашу медиатеку</string>
+    <string name="onboarding_welcome_back">Добро пожаловать в Flow</string>
     <string name="onboarding_listen_style">Слушай со стилем</string>
     <string name="onboarding_feature_hifi">Поддержка HiFi-аудио</string>
 
@@ -384,10 +384,10 @@
     <string name="onboarding_reminder_desc">Если вы пропустили какие-либо разрешения, вы можете включить их позже в Настройки > Безопасность > Разрешения.</string>
     <string name="onboarding_reminder_button">Понятно</string>
     <string name="onboarding_folder_visibility_title">Видимость папок</string>
-    <string name="onboarding_folder_visibility_desc">По умолчанию Lune показывает только песни из выбранной музыкальной папки. Включите эту опцию, чтобы сразу показывать все папки с музыкой на устройстве.</string>
+    <string name="onboarding_folder_visibility_desc">По умолчанию Flow показывает только песни из выбранной музыкальной папки. Включите эту опцию, чтобы сразу показывать все папки с музыкой на устройстве.</string>
     <string name="onboarding_folder_visibility_label">Показывать все папки</string>
     <string name="onboarding_support_title">Поддержка проекта</string>
-    <string name="onboarding_support_desc">Если вам нравится Lune, поддержите нас в разделе «Пожертвования» в Настройках > О приложении. Каждый вклад помогает развитию!</string>
+    <string name="onboarding_support_desc">Если вам нравится Flow, поддержите проект в разделе «Пожертвования» в Настройках &gt; О приложении. Каждый вклад помогает развитию!</string>
     <string name="search_play_all">Играть</string>
     <string name="search_shuffle">Перемешать</string>
     <string name="playing_from">Воспроизводится из: %s</string>
@@ -437,9 +437,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">Быстрое воспроизведение</string>
-    <string name="open_in_lune">Открыть в Lune</string>
+    <string name="open_in_lune">Открыть в Flow</string>
     <string name="close">Закрыть</string>
-    <string name="cd_open_in_lune">Открыть в Lune</string>
+    <string name="cd_open_in_lune">Открыть в Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">Редактировать текст</string>
@@ -463,4 +463,122 @@
     <string name="auto_sync_backup">Автосинхронизация резервной копии</string>
     <string name="auto_sync_backup_desc">Автоматически обновлять экспортированную копию при изменении плейлистов или текстов</string>
     <string name="auto_sync_requires_export">Сначала экспортируйте резервную копию для включения автосинхронизации</string>
+
+    <!-- Studio Crossfade, Automix, Blacklist, Covers & Metadata -->
+    <string name="adaptive_crossfade">Адаптивная длительность ИИ</string>
+    <string name="adaptive_crossfade_desc">Автоматически подбирать длину кроссфейда по энергии и стилю трека</string>
+    <string name="crossfade_silence_detection">Умная обрезка тишины в конце</string>
+    <string name="crossfade_silence_detection_desc">Начинать переход раньше при обнаружении затухания или тишины</string>
+    <string name="go_to_album">Перейти к альбому</string>
+    <string name="blacklist_song">Скрыть трек (Чёрный список)</string>
+    <string name="song_blacklisted_toast">Трек скрыт и добавлен в чёрный список</string>
+    <string name="manage_blacklist">Чёрный список и скрытые элементы</string>
+    <string name="manage_blacklist_desc">Управление скрытыми треками и исключёнными папками</string>
+    <string name="blacklisted_songs">Скрытые треки</string>
+    <string name="blacklisted_folders">Скрытые папки</string>
+    <string name="blacklist_empty">Нет скрытых треков или папок</string>
+    <string name="restore_item">Восстановить</string>
+    <string name="change_playlist_cover">Изменить обложку</string>
+    <string name="remove_playlist_cover">Сбросить обложку</string>
+    <string name="playlist_cover_updated">Обложка плейлиста обновлена</string>
+    <string name="metadata_saved_file">Теги записаны напрямую в аудиофайл</string>
+    <string name="metadata_saved_local_fallback">Сохранено локально в Flow (файл только для чтения)</string>
+    <string name="metadata_permission_needed">Предоставьте доступ к файлу для постоянного сохранения тегов</string>
+
+    <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
+    <string name="replaygain_section">ReplayGain и нормализация громкости</string>
+    <string name="replaygain_desc">Единая громкость треков с помощью тегов или анализа RMS/LUFS в реальном времени</string>
+    <string name="replaygain_mode_off">Выкл.</string>
+    <string name="replaygain_mode_track">Трек</string>
+    <string name="replaygain_mode_album">Альбом</string>
+    <string name="replaygain_mode_smart">Умный альбом</string>
+    <string name="replaygain_preamp_tagged">Предусиление (с тегами)</string>
+    <string name="replaygain_preamp_untagged">Предусиление (без тегов)</string>
+    <string name="replaygain_fallback_analysis">Умный анализ RMS/LUFS</string>
+    <string name="replaygain_fallback_analysis_desc">Оценка громкости треков без тегов ReplayGain/R128 с помощью быстрой выборки PCM</string>
+    <string name="replaygain_prevent_clipping">Пиковый лимитер против клиппинга</string>
+    <string name="replaygain_prevent_clipping_desc">Автоматически ограничивать положительное усиление для защиты от искажений</string>
+    <string name="show_replaygain_badge">Показывать значок ReplayGain в плеере</string>
+    <string name="show_replaygain_badge_desc">Отображать текущую коррекцию в дБ рядом со значками качества</string>
+
+    <string name="gapless_section">Gapless-аудио и расширенные кодеки</string>
+    <string name="gapless_audio">Истинное Gapless-воспроизведение</string>
+    <string name="gapless_audio_desc">Бесшовные переходы между треками с точностью до сэмпла</string>
+    <string name="gapless_album_priority">Приоритет Gapless на непрерывных альбомах</string>
+    <string name="gapless_album_priority_desc">Автоматически использовать Gapless вместо кроссфейда для последовательных треков одного альбома</string>
+    <string name="extended_formats_supported">Поддерживаемые форматы: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (стерео и 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
+
+    <string name="multitag_title">Мульти-исполнители, жанры и белый список</string>
+    <string name="multitag_desc">Настройка разделителей, извлечения feat. из названий и защищённых имён групп</string>
+    <string name="enable_multi_artist">Индексация нескольких исполнителей</string>
+    <string name="enable_multi_artist_desc">Отображать трек у каждого участвующего исполнителя отдельно</string>
+    <string name="enable_multi_genre">Индексация нескольких жанров</string>
+    <string name="enable_multi_genre_desc">Привязывать треки сразу к нескольким жанрам</string>
+    <string name="split_semicolon">Точка с запятой (;)</string>
+    <string name="split_comma">Запятая (,)</string>
+    <string name="split_slash">Косая черта (/ | \\)</string>
+    <string name="split_ampersand">Амперсанд (&amp;)</string>
+    <string name="split_feat_keywords">Связки (ft., feat., con, with, vs., x)</string>
+    <string name="extract_artists_from_title">Извлекать приглашённых артистов из названия</string>
+    <string name="extract_artists_from_title_desc">Распознавать (ft. Артист) или [feat. Артист] в названиях без дублирования тегов</string>
+    <string name="clean_feat_from_title">Скрывать извлечённый (ft. …) из названия трека</string>
+    <string name="clean_feat_from_title_desc">Сохранять чистое название трека, индексируя приглашённых артистов</string>
+    <string name="whitelist_section">Защищённый белый список (Не разделять)</string>
+    <string name="whitelist_desc">Имена вроде AC/DC, Tyler, The Creator или R&amp;B защищены от разделения. Добавьте свои ниже:</string>
+    <string name="whitelist_input_hint">Добавить артиста или жанр (напр. Simon &amp; Garfunkel)</string>
+    <string name="whitelist_add">Защитить</string>
+    <string name="whitelist_protect_chip">Защитить в белом списке</string>
+    <string name="whitelist_default_badge">Встроенные защищённые имена</string>
+    <string name="choose_artist">Выберите исполнителя</string>
+    <string name="parsed_artists_preview">Обнаруженные исполнители</string>
+    <string name="parsed_genres_preview">Обнаруженные жанры</string>
+
+    <string name="performance_profile_title">Режим производительности и ресурсов</string>
+    <string name="performance_profile_desc">Оптимизация CPU, ОЗУ и GPU для слабых или старых устройств</string>
+    <string name="perf_mode_auto">Авто</string>
+    <string name="perf_mode_ultra_saver">Ультра-экономия</string>
+    <string name="perf_mode_light">Лёгкий</string>
+    <string name="perf_mode_full">Полные эффекты</string>
+    <string name="perf_mode_auto_hint">Автоматически определяет слабые CPU, мало ОЗУ или старые GPU и отключает тяжёлое размытие, сохраняя 100% качество звука</string>
+
+    <string name="adaptive_ui_section">Адаптивность экрана и плотность</string>
+    <string name="ui_density_title">Плотность интерфейса</string>
+    <string name="ui_density_compact">Компактная</string>
+    <string name="ui_density_standard">Стандартная</string>
+    <string name="ui_density_comfortable">Просторная</string>
+    <string name="ui_font_scale_title">Масштаб текста</string>
+    <string name="grid_columns_title">Колонки сетки</string>
+    <string name="grid_columns_auto">Авто</string>
+    <string name="grid_columns_desc">Автоматическое число колонок под размер экрана или фиксированное значение</string>
+    <string name="ui_density_desc">Настройка отступов и компактности карточек под любой экран</string>
+    <string name="ui_density_spacious">Просторная</string>
+    <string name="replaygain_mode_title">Режим нормализации</string>
+    <string name="replaygain_mode_desc">Поддерживать ровную громкость по тегам ReplayGain/R128 или лёгкому анализу RMS/LUFS</string>
+    <string name="replaygain_rms_fallback">Анализ LUFS / RMS в реальном времени</string>
+    <string name="replaygain_rms_fallback_desc">Расчёт K-взвешенной громкости LUFS и пиков в реальном времени для треков без тегов</string>
+    <string name="replaygain_badge_player">Показывать значок ReplayGain / LUFS дБ в плеере</string>
+    <string name="gapless_playback">Истинное Gapless-воспроизведение</string>
+    <string name="gapless_playback_desc">Бесшовные переходы между треками с точностью до сэмпла</string>
+    <string name="gapless_smart_album">Учитывать Gapless на непрерывных альбомах</string>
+    <string name="gapless_smart_album_desc">Автоматически пропускать кроссфейд при последовательном воспроизведении одного альбома</string>
+    <string name="extended_formats_title">Расширенные и многоканальные аудиоформаты</string>
+    <string name="extended_formats_desc">Совместимость на Android и ПК: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (стерео и 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
+    <string name="multitag_section">Мульти-исполнители, жанры и белый список</string>
+    <string name="multitag_separators_title">Активные разделители</string>
+    <string name="whitelist_manage">Защищённый белый список (Не разделять)</string>
+    <string name="whitelist_manage_desc">Артисты и жанры из этого списка (напр. AC/DC, Tyler, The Creator, R&amp;B) никогда не разделяются</string>
+    <string name="whitelist_add_hint">Добавить артиста или жанр (напр. Wisin &amp; Yandel)</string>
+    <string name="whitelist_add_button">Добавить в белый список</string>
+    <string name="whitelist_defaults_info">Встроенные защищённые имена</string>
+    <string name="whitelist_added_toast">«%1$s» защищено в белом списке</string>
+    <string name="perf_mode_ultra_saver_desc">Минимум ОЗУ и нулевая нагрузка GPU без размытия и анимаций для 1–2 ядерных устройств</string>
+    <string name="perf_mode_light_desc">Отключает шейдеры размытия и непрерывные анимации для плавных 60 FPS</string>
+    <string name="perf_mode_full_desc">Включает все визуальные эффекты, динамическое размытие и анимации</string>
+    <string name="fork_attribution_title">Открытый форк проекта Lune</string>
+    <string name="fork_attribution_desc">Flow — это кроссплатформенный (Android, Windows и Linux) аудиофильский форк проекта Lune (https://github.com/MrDemonc/Lune) от MrDemonc, оптимизированный для сверхнизкого потребления ОЗУ/CPU, нормализации LUFS в реальном времени, Gapless и расширенных кодеков под лицензией GPLv3.</string>
+    <string name="fork_open_original_repo">Оригинальный репозиторий Lune (GitHub)</string>
+    <string name="analyze_library_lufs">Анализ громкости медиатеки (LUFS)</string>
+    <string name="analyze_library_lufs_desc">Фоновый расчёт громкости ITU-R BS.1770 LUFS для треков без тегов</string>
+    <string name="analyzing_library_progress">Анализ громкости LUFS: %1$d / %2$d треков…</string>
+    <string name="library_scan_progress">Индексация медиатеки и кодеков (%1$d треков)…</string>
 </resources>

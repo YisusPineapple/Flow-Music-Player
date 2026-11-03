@@ -1033,12 +1033,12 @@ fun MainScreen(
     ) {
         val rotation = remember { Animatable(0f) }
 
-        LaunchedEffect(isPlaying, ultraSaverActive) {
-            if (isPlaying && !ultraSaverActive) {
+        LaunchedEffect(isPlaying, lowResourceVisuals) {
+            if (isPlaying && !lowResourceVisuals) {
                 while (true) {
                     rotation.animateTo(
                         targetValue = 360f,
-                        animationSpec = tween(durationMillis = 2000, easing = LinearEasing)
+                        animationSpec = tween(durationMillis = 3600, easing = LinearEasing)
                     )
                     rotation.snapTo(0f)
                 }
@@ -1230,7 +1230,8 @@ fun MainScreen(
                 LargeTopAppBar(
                     title = { 
                         val customTitle by settingsManager.customTitleFlow.collectAsState()
-                        val titleText = if (customTitle.isEmpty()) "Lune" else customTitle
+                        val defaultAppName = stringResource(R.string.app_name)
+                        val titleText = customTitle.ifEmpty { defaultAppName }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1312,11 +1313,55 @@ fun MainScreen(
             }
         ) { innerPadding ->
             Column(modifier = Modifier.padding(top = innerPadding.calculateTopPadding())) {
+                val scanProgress by MusicProvider.scanProgress.collectAsState()
+                val lufsStatus by com.demonlab.lune.audio.ReplayGainScanner.analysisStatus.collectAsState()
+
+                AnimatedVisibility(
+                    visible = scanProgress.isScanning || lufsStatus.isRunning,
+                    enter = if (ultraSaverActive) EnterTransition.None else fadeIn(tween(150)) + expandVertically(tween(150)),
+                    exit = if (ultraSaverActive) ExitTransition.None else fadeOut(tween(150)) + shrinkVertically(tween(150))
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = if (scanProgress.isScanning) {
+                                    stringResource(R.string.library_scan_progress, scanProgress.discoveredCount)
+                                } else {
+                                    stringResource(
+                                        R.string.analyzing_library_progress,
+                                        lufsStatus.processedCount,
+                                        lufsStatus.totalCount
+                                    )
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
 
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
-                    beyondViewportPageCount = 1
+                    beyondViewportPageCount = if (lowResourceVisuals) 0 else 1
                 ) { pageIndex ->
                     val folder = folders.getOrElse(pageIndex) { "ALL" }
 
@@ -2656,8 +2701,18 @@ fun MainScreen(
         // Full Player
         AnimatedVisibility(
             visible = isPlayerExpanded,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it })
+            enter = when {
+                ultraSaverActive -> EnterTransition.None
+                lowResourceVisuals -> fadeIn(tween(140)) + slideInVertically(tween(170, easing = FastOutSlowInEasing)) { it / 5 }
+                else -> fadeIn(tween(200)) + slideInVertically(
+                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                ) { it }
+            },
+            exit = when {
+                ultraSaverActive -> ExitTransition.None
+                lowResourceVisuals -> fadeOut(tween(120)) + slideOutVertically(tween(150, easing = FastOutLinearInEasing)) { it / 5 }
+                else -> fadeOut(tween(180)) + slideOutVertically(tween(220, easing = FastOutSlowInEasing)) { it }
+            }
         ) {
             val song = currentSong
             if (song != null) {

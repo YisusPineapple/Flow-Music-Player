@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -74,6 +75,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -291,7 +293,7 @@ fun AudioQualityBadges(
         ((effectiveBitrate ?: 0) >= 2304000)
 
     val isHiFi = !isHiRes && (song.isHiFi ||
-        format in listOf("FLAC", "WAV", "ALAC", "APE", "AIFF", "AIF", "WV") ||
+        format in listOf("FLAC", "WAV", "ALAC", "APE", "AIFF", "AIF", "AIFC", "WV", "CAF") ||
         ((effectiveBitrate ?: 0) > 320000))
 
     val isHq = !isHiRes && !isHiFi && ((effectiveBitrate ?: 0) >= 256000)
@@ -309,7 +311,11 @@ fun AudioQualityBadges(
     val rgBadgeText = if (showRgBadge) {
         val db = playbackManager.activeReplayGainDb
         val sign = if (db >= 0f) "+" else ""
-        val prefix = if (playbackManager.activeReplayGainSource == "RMS") "Auto" else "RG"
+        val prefix = when (playbackManager.activeReplayGainSource) {
+            "LUFS", "RMS", "AUTO" -> "LUFS"
+            "UNTAGGED" -> "PRE"
+            else -> "RG"
+        }
         val lim = if (playbackManager.activeReplayGainPeakLimited) "!" else ""
         "$prefix $sign${String.format(java.util.Locale.US, "%.1f", db)} dB$lim"
     } else null
@@ -895,31 +901,31 @@ fun FullPlayer(
     val scale: Float
     val orbitX: Float
     val orbitY: Float
-    if (isCinematic && !lowResourceVisuals) {
+    if (isCinematic && isPlaying && !lowResourceVisuals) {
         val infiniteTransition = rememberInfiniteTransition(label = "CoverAnimation")
         val animScale by infiniteTransition.animateFloat(
-            initialValue = 1.1f,
-            targetValue = 1.3f,
+            initialValue = 1.08f,
+            targetValue = 1.24f,
             animationSpec = infiniteRepeatable(
-                animation = tween(24000, easing = FastOutSlowInEasing),
+                animation = tween(26000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
             label = "Scale"
         )
         val animOrbitX by infiniteTransition.animateFloat(
-            initialValue = -0.05f,
-            targetValue = 0.05f,
+            initialValue = -0.04f,
+            targetValue = 0.04f,
             animationSpec = infiniteRepeatable(
-                animation = tween(23000, easing = FastOutSlowInEasing),
+                animation = tween(24000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
             label = "OrbitX"
         )
         val animOrbitY by infiniteTransition.animateFloat(
-            initialValue = -0.04f,
-            targetValue = 0.04f,
+            initialValue = -0.035f,
+            targetValue = 0.035f,
             animationSpec = infiniteRepeatable(
-                animation = tween(29000, easing = FastOutSlowInEasing),
+                animation = tween(30000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
             label = "OrbitY"
@@ -928,7 +934,7 @@ fun FullPlayer(
         orbitX = animOrbitX
         orbitY = animOrbitY
     } else {
-        scale = 1.05f
+        scale = 1.04f
         orbitX = 0f
         orbitY = 0f
     }
@@ -969,25 +975,29 @@ fun FullPlayer(
     var lastSongId by remember { mutableStateOf<Long?>(null) }
     var lastBounceTime by remember { mutableLongStateOf(0L) }
 
-    val triggerCoverBounce: () -> Unit = remember(coroutineScope) {
+    val triggerCoverBounce: () -> Unit = remember(coroutineScope, ultraSaverActive, lowResourceVisuals) {
         {
-            val now = System.currentTimeMillis()
-            if (now - lastBounceTime > 150) {
-                lastBounceTime = now
-                coroutineScope.launch {
-                    // Fase 1: Compresión elástica fluida sin saltos bruscos
-                    coverBounceScale.animateTo(
-                        targetValue = 0.92f,
-                        animationSpec = tween(durationMillis = 75, easing = FastOutSlowInEasing)
-                    )
-                    // Fase 2: Rebote elástico continuo Material 3 Expressive
-                    coverBounceScale.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow
+            if (!ultraSaverActive) {
+                val now = System.currentTimeMillis()
+                if (now - lastBounceTime > 150) {
+                    lastBounceTime = now
+                    coroutineScope.launch {
+                        coverBounceScale.animateTo(
+                            targetValue = 0.94f,
+                            animationSpec = tween(durationMillis = if (lowResourceVisuals) 60 else 75, easing = FastOutSlowInEasing)
                         )
-                    )
+                        coverBounceScale.animateTo(
+                            targetValue = 1f,
+                            animationSpec = if (lowResourceVisuals) {
+                                tween(durationMillis = 110, easing = FastOutSlowInEasing)
+                            } else {
+                                spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -1117,6 +1127,12 @@ fun FullPlayer(
             }
         }
 
+        val crossfadeMs = when {
+            ultraSaverActive -> 0
+            lowResourceVisuals -> 140
+            else -> 320
+        }
+
         if (isCinematic) {
             val cinematicTransform: @Composable (Modifier) -> Modifier = { mod ->
                 mod.clipToBounds().graphicsLayer {
@@ -1130,13 +1146,14 @@ fun FullPlayer(
 
             Crossfade(
                 targetState = song,
-                animationSpec = tween(400, easing = FastOutSlowInEasing),
+                animationSpec = tween(crossfadeMs, easing = FastOutSlowInEasing),
                 label = "CinematicArtCrossfade"
             ) { targetSong ->
-                val request = remember(targetSong.id, targetSong.coverUrl) {
+                val request = remember(targetSong.id, targetSong.coverUrl, lowResourceVisuals) {
                     ImageRequest.Builder(context)
                         .data(targetSong.coverUrl ?: targetSong.uri)
-                        .crossfade(true)
+                        .size(if (lowResourceVisuals) 420 else 768)
+                        .crossfade(!lowResourceVisuals)
                         .fallback(R.drawable.ic_artwork_fallback)
                         .error(R.drawable.ic_artwork_fallback)
                         .build()
@@ -1153,20 +1170,21 @@ fun FullPlayer(
                 val blurGradientBrush = if (isLandscape) {
                     Brush.horizontalGradient(
                         0.00f to Color.Transparent,
-                        0.35f to Color.Transparent,
-                        0.45f to Color.Black.copy(alpha = 0.3f),
-                        0.55f to Color.Black.copy(alpha = 0.6f),
-                        0.70f to Color.Black.copy(alpha = 0.85f),
-                        1.00f to Color.Black.copy(alpha = 0.95f)
+                        0.32f to Color.Transparent,
+                        0.45f to Color.Black.copy(alpha = 0.35f),
+                        0.58f to Color.Black.copy(alpha = 0.68f),
+                        0.74f to Color.Black.copy(alpha = 0.88f),
+                        1.00f to Color.Black.copy(alpha = 0.96f)
                     )
                 } else {
                     Brush.verticalGradient(
-                        0.00f to Color.Transparent,
-                        0.35f to Color.Transparent,
-                        0.45f to Color.Black.copy(alpha = 0.3f),
-                        0.55f to Color.Black.copy(alpha = 0.6f),
-                        0.70f to Color.Black.copy(alpha = 0.85f),
-                        1.00f to Color.Black.copy(alpha = 0.95f)
+                        0.00f to Color.Black.copy(alpha = 0.25f),
+                        0.14f to Color.Transparent,
+                        0.36f to Color.Transparent,
+                        0.48f to Color.Black.copy(alpha = 0.36f),
+                        0.62f to Color.Black.copy(alpha = 0.72f),
+                        0.78f to Color.Black.copy(alpha = 0.90f),
+                        1.00f to Color.Black.copy(alpha = 0.96f)
                     )
                 }
 
@@ -1181,12 +1199,13 @@ fun FullPlayer(
                 ) {
                     Crossfade(
                         targetState = song,
-                        animationSpec = tween(400, easing = LinearOutSlowInEasing),
+                        animationSpec = tween(crossfadeMs, easing = LinearOutSlowInEasing),
                         label = "CinematicBlurCrossfade"
                     ) { targetSong ->
                         val request = remember(targetSong.id, targetSong.coverUrl) {
                             ImageRequest.Builder(context)
                                 .data(targetSong.coverUrl ?: targetSong.uri)
+                                .size(256, 256)
                                 .crossfade(true)
                                 .fallback(R.drawable.ic_artwork_fallback)
                                 .error(R.drawable.ic_artwork_fallback)
@@ -1198,7 +1217,7 @@ fun FullPlayer(
                             modifier = cinematicTransform(
                                 Modifier
                                     .fillMaxSize()
-                                    .blur(80.dp)
+                                    .blur(64.dp)
                             ),
                             contentScale = ContentScale.Crop
                         )
@@ -1206,30 +1225,27 @@ fun FullPlayer(
                 }
             } else {
                 val surf = MaterialTheme.colorScheme.surface
-                val mAlpha = if (isDarkTheme) 0.6f else 0.3f
+                val mAlpha = if (isDarkTheme) 0.72f else 0.52f
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             if (isLandscape) {
                                 Brush.horizontalGradient(
-                                    0.00f to Color.Transparent,
-                                    0.30f to Color.Transparent,
-                                    0.45f to surf.copy(alpha = mAlpha * 0.3f),
-                                    0.50f to surf.copy(alpha = mAlpha * 0.8f),
-                                    0.55f to surf,
+                                    0.00f to surf.copy(alpha = 0.18f),
+                                    0.28f to Color.Transparent,
+                                    0.44f to surf.copy(alpha = mAlpha * 0.45f),
+                                    0.54f to surf.copy(alpha = mAlpha * 0.88f),
+                                    0.64f to surf,
                                     1.00f to surf
                                 )
                             } else {
                                 Brush.verticalGradient(
-                                    0.00f to Color.Transparent,
-                                    0.10f to Color.Transparent,
-                                    0.25f to surf.copy(alpha = mAlpha * 0.2f),
-                                    0.35f to surf.copy(alpha = mAlpha * 0.5f),
-                                    0.42f to surf.copy(alpha = mAlpha * 0.85f),
-                                    0.48f to surf.copy(alpha = mAlpha + (1f - mAlpha) * 0.4f),
-                                    0.52f to surf.copy(alpha = mAlpha + (1f - mAlpha) * 0.75f),
-                                    0.56f to surf.copy(alpha = mAlpha + (1f - mAlpha) * 0.9f),
+                                    0.00f to surf.copy(alpha = 0.34f),
+                                    0.12f to Color.Transparent,
+                                    0.30f to surf.copy(alpha = mAlpha * 0.25f),
+                                    0.42f to surf.copy(alpha = mAlpha * 0.65f),
+                                    0.52f to surf.copy(alpha = mAlpha + (1f - mAlpha) * 0.60f),
                                     0.60f to surf,
                                     1.00f to surf
                                 )
@@ -1320,16 +1336,39 @@ fun FullPlayer(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = if (useTwoPane) 8.dp else 16.dp),
+                        .padding(bottom = if (useTwoPane) 8.dp else 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Add to Playlist button: Material 3 Expressive rounded square container
+                    // Minimize / Collapse Player button (48.dp M3 touch target)
                     Surface(
-                        onClick = { showAddToPlaylistInPlayer = true },
-                        shape = RoundedCornerShape(14.dp),
+                        onClick = onMinimize,
+                        shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 6.dp, bottomEnd = 6.dp),
                         color = topBarBtnBg,
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(48.dp)
+                            .testTag("player_minimize_button")
+                            .bounceClick()
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.cd_back),
+                                tint = topBarBtnTint,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // Add to Playlist button: paired pill container (48.dp touch target)
+                    Surface(
+                        onClick = { showAddToPlaylistInPlayer = true },
+                        shape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 24.dp, bottomEnd = 24.dp),
+                        color = topBarBtnBg,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_add_playlist_button")
                             .bounceClick()
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -1337,7 +1376,7 @@ fun FullPlayer(
                                 imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = stringResource(R.string.add_to_playlist),
                                 tint = topBarBtnTint,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(23.dp)
                             )
                         }
                     }
@@ -1396,10 +1435,11 @@ fun FullPlayer(
                                 val eqIntent = Intent(context, EqualizerActivity::class.java)
                                 context.startActivity(eqIntent)
                             },
-                            shape = RoundedCornerShape(topStart = 23.dp, bottomStart = 23.dp, topEnd = 5.dp, bottomEnd = 5.dp),
+                            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 5.dp, bottomEnd = 5.dp),
                             color = topBarBtnBg,
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(48.dp)
+                                .testTag("player_equalizer_button")
                                 .bounceClick()
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -1415,10 +1455,11 @@ fun FullPlayer(
                         // 2. Extra Options BottomSheet Button
                         Surface(
                             onClick = { showOptionsSheet = true },
-                            shape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 23.dp, bottomEnd = 23.dp),
+                            shape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp, topEnd = 24.dp, bottomEnd = 24.dp),
                             color = topBarBtnBg,
                             modifier = Modifier
-                                .size(46.dp)
+                                .size(48.dp)
+                                .testTag("player_output_options_button")
                                 .bounceClick()
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -1461,8 +1502,19 @@ fun FullPlayer(
                         modifier = coverModifier,
                     )
                 } else {
+                    val auraColor = dynamicPrimaryColor.copy(alpha = if (isDarkTheme) 0.18f else 0.12f)
                     Box(
-                        modifier = coverModifier,
+                        modifier = coverModifier
+                            .drawBehind {
+                                if (!hasBlurBackground) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(auraColor, Color.Transparent),
+                                            radius = size.minDimension * 0.62f
+                                        )
+                                    )
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
@@ -1476,7 +1528,7 @@ fun FullPlayer(
                         ) {
                             Crossfade(
                                 targetState = song,
-                                animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing),
+                                animationSpec = tween(durationMillis = crossfadeMs, easing = LinearOutSlowInEasing),
                                 label = "FullPlayerCoverCrossfade"
                             ) { targetSong ->
                                 if (coverShape == 2 && coverVinylEffect) {
@@ -1487,12 +1539,17 @@ fun FullPlayer(
                                     )
                                 } else {
                                     val activeShape = when (coverShape) {
-                                        1 -> RoundedCornerShape(0.dp)
+                                        1 -> RoundedCornerShape(8.dp)
                                         2 -> CircleShape
                                         else -> RoundedCornerShape(28.dp)
                                     }
                                     Surface(
                                         shape = activeShape,
+                                        border = BorderStroke(
+                                            width = 1.dp,
+                                            color = if (isDarkTheme) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+                                        ),
+                                        shadowElevation = if (ultraSaverActive) 0.dp else 12.dp,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .rotate(if (coverShape == 2 && coverSpin && isPlaying) spinRotation else 0f),
@@ -1501,7 +1558,7 @@ fun FullPlayer(
                                     ) {
                                         SongCoverImage(
                                             coverUrl = targetSong.coverUrl ?: targetSong.uri,
-                                            contentDescription = null,
+                                            contentDescription = targetSong.title,
                                             modifier = Modifier.fillMaxSize(),
                                             shape = activeShape,
                                             iconScale = 0.68f
@@ -1904,69 +1961,138 @@ fun FullPlayer(
                 label = "repeatTint"
             )
 
-            Row(
+            val dockPillBg = if (useBlurControls) {
+                blurContainerColor
+            } else if (isAmoled) {
+                Color(0xFF1A1A1A)
+            } else if (isDarkTheme) {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+            }
+
+            val activeUtilityChipBg = if (useBlurControls) {
+                Color.White.copy(alpha = 0.22f)
+            } else {
+                activeAccent.copy(alpha = 0.16f)
+            }
+
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = dockPillBg,
+                border = BorderStroke(
+                    width = 0.8.dp,
+                    color = if (useBlurControls || isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 4.dp)
             ) {
-                // 1. Shuffle
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(38.dp)
-                        .bounceClick(0.92f)
-                        .clip(CircleShape)
-                        .clickable { playbackManager.toggleShuffle() },
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = stringResource(R.string.option_shuffle),
-                        tint = shuffleTint,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                    // 1. Shuffle (48.dp accessible target)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_shuffle_button")
+                            .bounceClick(0.92f)
+                            .clip(CircleShape)
+                            .background(if (isShuffling) activeUtilityChipBg else Color.Transparent)
+                            .clickable { playbackManager.toggleShuffle() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = stringResource(R.string.option_shuffle),
+                            tint = shuffleTint,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
 
-                // 2. Repeat
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .bounceClick(0.92f)
-                        .clip(CircleShape)
-                        .combinedClickable(
-                            onClick = { playbackManager.toggleRepeatMode() },
-                            onLongClick = { showCustomRepeatDialog = true }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = repeatIcon,
-                        contentDescription = stringResource(R.string.option_repeat),
-                        tint = repeatTint,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                    // 2. Repeat (48.dp accessible target)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_repeat_button")
+                            .bounceClick(0.92f)
+                            .clip(CircleShape)
+                            .background(if (isRepeatActive) activeUtilityChipBg else Color.Transparent)
+                            .combinedClickable(
+                                onClick = { playbackManager.toggleRepeatMode() },
+                                onLongClick = { showCustomRepeatDialog = true }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = repeatIcon,
+                            contentDescription = stringResource(R.string.option_repeat),
+                            tint = repeatTint,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
 
-                // 3. Queue
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .bounceClick(0.92f)
-                        .clip(CircleShape)
-                        .clickable { showQueueSheet = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                        contentDescription = stringResource(R.string.player_queue),
-                        tint = defaultIconTint,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    // 3. Audio & LUFS Telemetry Sheet (48.dp accessible target)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_audio_telemetry_button")
+                            .bounceClick(0.92f)
+                            .clip(CircleShape)
+                            .clickable { showAudioDetailsSheet = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.HighQuality,
+                            contentDescription = stringResource(R.string.audio_quality_details),
+                            tint = defaultIconTint,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+
+                    // 4. Queue (48.dp accessible target)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_queue_button")
+                            .bounceClick(0.92f)
+                            .clip(CircleShape)
+                            .clickable { showQueueSheet = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = stringResource(R.string.player_queue),
+                            tint = defaultIconTint,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+
+                    // 5. Speed / Sleep Timer / Options Sheet (48.dp accessible target)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("player_more_options_button")
+                            .bounceClick(0.92f)
+                            .clip(CircleShape)
+                            .clickable { showOptionsSheet = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = stringResource(R.string.player_options),
+                            tint = defaultIconTint,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isLandscape) 10.dp else 16.dp))
+            Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 14.dp))
         }
 
         BoxWithConstraints(

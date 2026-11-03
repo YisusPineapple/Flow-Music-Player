@@ -45,6 +45,10 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.Alignment
+import com.demonlab.lune.audio.ReplayGainScanner
+import com.demonlab.lune.tools.MusicProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class AudioSettingsActivity : ComponentActivity() {
@@ -107,6 +111,8 @@ fun AudioSettingsScreen(onBack: () -> Unit) {
     var replayGainUntaggedPreampDb by remember { mutableFloatStateOf(settingsManager.replayGainUntaggedPreampDb) }
     var replayGainPreventClipping by remember { mutableStateOf(settingsManager.replayGainPreventClipping) }
     var replayGainRmsFallback by remember { mutableStateOf(settingsManager.replayGainRmsFallback) }
+    val lufsAnalysisStatus by ReplayGainScanner.analysisStatus.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
     // Gapless Audio states
     var isGaplessEnabled by remember { mutableStateOf(settingsManager.isGaplessEnabled) }
@@ -315,7 +321,7 @@ fun AudioSettingsScreen(onBack: () -> Unit) {
                         headlineText = stringResource(R.string.replaygain_prevent_clipping),
                         supportingText = stringResource(R.string.replaygain_prevent_clipping_desc),
                         icon = Icons.Default.Tune,
-                        position = SectionPosition.LAST,
+                        position = SectionPosition.MIDDLE,
                         trailingContent = {
                             BouncySwitch(
                                 checked = replayGainPreventClipping,
@@ -333,6 +339,41 @@ fun AudioSettingsScreen(onBack: () -> Unit) {
                                 }
                             )
                         }
+                    )
+
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.analyze_library_lufs),
+                        supportingText = if (lufsAnalysisStatus.isRunning) {
+                            stringResource(
+                                R.string.analyzing_library_progress,
+                                lufsAnalysisStatus.processedCount,
+                                lufsAnalysisStatus.totalCount
+                            )
+                        } else {
+                            stringResource(R.string.analyze_library_lufs_desc)
+                        },
+                        icon = Icons.Default.GraphicEq,
+                        position = SectionPosition.LAST,
+                        onClick = {
+                            if (!lufsAnalysisStatus.isRunning) {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    val cachedSongs = MusicProvider(context).getCachedSongs()
+                                    ReplayGainScanner.analyzeLibraryUntaggedInBackground(
+                                        context = context,
+                                        songs = cachedSongs,
+                                        maxTracksPerPass = 500
+                                    )
+                                }
+                            }
+                        },
+                        trailingContent = if (lufsAnalysisStatus.isRunning) {
+                            {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.5.dp
+                                )
+                            }
+                        } else null
                     )
                 }
 

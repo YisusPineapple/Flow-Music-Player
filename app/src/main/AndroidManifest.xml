@@ -12,9 +12,6 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <queries>
-        <provider android:authorities="androidx.car.app.connection" />
-    </queries>
 
     <application
         android:name=".LuneApplication"
@@ -65,6 +62,24 @@
                 <data android:mimeType="application/x-ogg" />
                 <data android:mimeType="application/flac" />
                 <data android:mimeType="application/x-flac" />
+                <data android:mimeType="audio/x-matroska" />
+                <data android:mimeType="video/x-matroska" />
+                <data android:mimeType="video/mp4" />
+                <data android:mimeType="video/webm" />
+                <data android:mimeType="audio/webm" />
+                <data android:mimeType="audio/aiff" />
+                <data android:mimeType="audio/x-aiff" />
+                <data android:mimeType="audio/alac" />
+                <data android:mimeType="audio/x-ape" />
+                <data android:mimeType="audio/x-wavpack" />
+                <data android:mimeType="audio/dsd" />
+                <data android:mimeType="audio/x-dsf" />
+                <data android:mimeType="audio/eac3" />
+                <data android:mimeType="audio/ac3" />
+                <data android:mimeType="audio/ac4" />
+                <data android:mimeType="audio/vnd.dts" />
+                <data android:mimeType="audio/x-ms-wma" />
+                <data android:mimeType="audio/x-caf" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -77,9 +92,28 @@
                 <data android:pathPattern=".*\\.flac" />
                 <data android:pathPattern=".*\\.wav" />
                 <data android:pathPattern=".*\\.m4a" />
+                <data android:pathPattern=".*\\.mp4" />
+                <data android:pathPattern=".*\\.alac" />
+                <data android:pathPattern=".*\\.aiff" />
+                <data android:pathPattern=".*\\.aif" />
+                <data android:pathPattern=".*\\.aifc" />
+                <data android:pathPattern=".*\\.ape" />
+                <data android:pathPattern=".*\\.wv" />
+                <data android:pathPattern=".*\\.dsf" />
+                <data android:pathPattern=".*\\.dff" />
+                <data android:pathPattern=".*\\.mkv" />
+                <data android:pathPattern=".*\\.mka" />
+                <data android:pathPattern=".*\\.webm" />
                 <data android:pathPattern=".*\\.ogg" />
                 <data android:pathPattern=".*\\.opus" />
                 <data android:pathPattern=".*\\.aac" />
+                <data android:pathPattern=".*\\.eac3" />
+                <data android:pathPattern=".*\\.ec3" />
+                <data android:pathPattern=".*\\.ac3" />
+                <data android:pathPattern=".*\\.ac4" />
+                <data android:pathPattern=".*\\.dts" />
+                <data android:pathPattern=".*\\.wma" />
+                <data android:pathPattern=".*\\.caf" />
             </intent-filter>
         </activity>
 
@@ -155,11 +189,18 @@
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false">
             <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name="androidx.media.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".tools.LuneWidgetProvider"

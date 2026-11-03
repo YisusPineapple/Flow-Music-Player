@@ -1,6 +1,6 @@
 {
-  "name": "Lune",
-  "description": "An advanced, elegant offline music player with smart mixes, equalizer, dynamic lyrics, and Hi-Fi audio.",
+  "name": "Flow",
+  "description": "Ultra-lightweight multiplatform audiophile music player for Android, Windows, and Linux (fork of Lune) with ReplayGain/LUFS, Gapless, and extended codecs.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

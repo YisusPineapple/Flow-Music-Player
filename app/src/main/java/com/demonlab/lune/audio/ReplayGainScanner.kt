@@ -5,18 +5,25 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import com.demonlab.lune.core.dsp.ReplayGainEngine
+import com.demonlab.lune.core.format.NativePcmContainerDecoder
+import com.demonlab.lune.core.format.SeekableByteReader
 import com.demonlab.lune.core.model.ReplayGainMetadata
 import com.demonlab.lune.tools.Song
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.Tag
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
 
 data class CachedLoudnessEntry(
@@ -29,17 +36,28 @@ data class CachedLoudnessEntry(
     val computedLoudnessDb: Float? = null
 )
 
+data class LibraryAnalysisStatus(
+    val isRunning: Boolean = false,
+    val processedCount: Int = 0,
+    val totalCount: Int = 0,
+    val currentTrackTitle: String = ""
+)
+
 /**
- * Lightweight, HDD-friendly ReplayGain & EBU R128 tag reader + sparse 3-window RMS/LUFS estimator.
- * Decodes < 450 ms of total audio across 3 seek points when tags are missing, caching results permanently
- * so modest/legacy devices never repeat disk or CPU work.
+ * Lightweight, HDD- & battery-friendly ReplayGain / EBU R128 tag reader + ITU-R BS.1770-4 K-weighted
+ * LUFS / RMS analyzer. Decodes < 450 ms of sparse audio across 3 seek points (or records real-time
+ * streaming LUFS during playback) and caches results permanently on disk.
  */
 object ReplayGainScanner {
 
     private val memoryCache = ConcurrentHashMap<String, CachedLoudnessEntry>()
     private val diskMutex = Mutex()
+    private val batchScanMutex = Mutex()
     private val gson = Gson()
     @Volatile private var cacheLoaded = false
+
+    private val _analysisStatus = MutableStateFlow(LibraryAnalysisStatus())
+    val analysisStatus: StateFlow<LibraryAnalysisStatus> = _analysisStatus.asStateFlow()
 
     private val RG_TRACK_GAIN_KEYS = listOf(
         "REPLAYGAIN_TRACK_GAIN", "replaygain_track_gain", "TXXX:REPLAYGAIN_TRACK_GAIN", "----:com.apple.iTunes:replaygain_track_gain"
@@ -84,6 +102,45 @@ object ReplayGainScanner {
         }
     }
 
+    fun trimInMemoryIfNeeded(maxEntries: Int = 4000) {
+        if (memoryCache.size > maxEntries) {
+            val iterator = memoryCache.keys.iterator()
+            var removed = 0
+            val targetRemove = memoryCache.size - maxEntries
+            while (iterator.hasNext() && removed < targetRemove) {
+                iterator.next()
+                iterator.remove()
+                removed++
+            }
+        }
+    }
+
+    suspend fun recordRealtimeComputedLoudness(
+        context: Context,
+        songPath: String,
+        gainDb: Float,
+        peak: Float
+    ) {
+        if (songPath.isBlank() || !gainDb.isFinite()) return
+        ensureCacheLoaded(context)
+        val lastMod = runCatching { File(songPath).takeIf { it.exists() }?.lastModified() ?: 0L }.getOrDefault(0L)
+        val prev = memoryCache[songPath]
+        if (prev != null && prev.hasAnyTag()) return
+        memoryCache[songPath] = CachedLoudnessEntry(
+            path = songPath,
+            lastModified = lastMod,
+            trackGainDb = prev?.trackGainDb,
+            trackPeak = peak.coerceIn(0.01f, 1.0f),
+            albumGainDb = prev?.albumGainDb,
+            albumPeak = prev?.albumPeak,
+            computedLoudnessDb = gainDb.coerceIn(-24f, 18f)
+        )
+        persistCache(context)
+    }
+
+    private fun CachedLoudnessEntry.hasAnyTag(): Boolean =
+        trackGainDb != null || albumGainDb != null
+
     fun extractReplayGainFromTag(tag: Tag?): ReplayGainMetadata {
         if (tag == null) return ReplayGainMetadata()
         fun firstCustom(keys: List<String>): String? {
@@ -119,10 +176,63 @@ object ReplayGainScanner {
         )
     }
 
+    /**
+     * Low-priority background batch analyzer for untagged tracks in the library.
+     * Yields between tracks and batches disk writes to minimize battery and I/O overhead.
+     */
+    suspend fun analyzeLibraryUntaggedInBackground(
+        context: Context,
+        songs: List<Song>,
+        maxTracksPerPass: Int = 60
+    ) = withContext(Dispatchers.IO) {
+        if (songs.isEmpty() || !batchScanMutex.tryLock()) return@withContext
+        try {
+            ensureCacheLoaded(context)
+            val candidates = songs.filter { s ->
+                s.path.isNotBlank() &&
+                    s.replayGainTrackDb == null &&
+                    s.replayGainAlbumDb == null &&
+                    s.computedLoudnessDb == null &&
+                    memoryCache[s.path]?.let { it.trackGainDb != null || it.albumGainDb != null || it.computedLoudnessDb != null } != true
+            }.take(maxTracksPerPass)
+
+            if (candidates.isEmpty()) return@withContext
+
+            _analysisStatus.value = LibraryAnalysisStatus(
+                isRunning = true,
+                processedCount = 0,
+                totalCount = candidates.size
+            )
+            var dirtyCount = 0
+            candidates.forEachIndexed { idx, track ->
+                yield()
+                _analysisStatus.value = LibraryAnalysisStatus(
+                    isRunning = true,
+                    processedCount = idx,
+                    totalCount = candidates.size,
+                    currentTrackTitle = track.title
+                )
+                resolveOrAnalyzeSong(context, track, allowFallbackDecode = true, deferPersist = true)
+                dirtyCount++
+                if (dirtyCount >= 8) {
+                    persistCache(context)
+                    dirtyCount = 0
+                }
+            }
+            if (dirtyCount > 0) {
+                persistCache(context)
+            }
+        } finally {
+            _analysisStatus.value = LibraryAnalysisStatus(isRunning = false)
+            batchScanMutex.unlock()
+        }
+    }
+
     suspend fun resolveOrAnalyzeSong(
         context: Context,
         song: Song,
-        allowFallbackDecode: Boolean
+        allowFallbackDecode: Boolean,
+        deferPersist: Boolean = false
     ): ReplayGainMetadata = withContext(Dispatchers.IO) {
         ensureCacheLoaded(context)
 
@@ -166,13 +276,15 @@ object ReplayGainScanner {
             )
             if (song.path.isNotBlank()) {
                 memoryCache[song.path] = entry
-                persistCache(context)
+                if (!deferPersist) persistCache(context)
             }
             return@withContext tagMeta
         }
 
-        // Step 2: Ultra-lightweight sparse 3-window PCM loudness analysis (< 450 ms decoded total)
+        // Step 2: Sparse 3-window K-weighted LUFS analysis (< 450 ms decoded total)
         val analyzed = analyzeSparseLoudness(context, song)
+            ?: file?.takeIf { it.exists() && it.canRead() }?.let { analyzeViaNativeContainerDecoder(it) }
+
         val finalMeta = ReplayGainMetadata(
             trackPeak = analyzed?.second,
             computedLoudnessDb = analyzed?.first
@@ -185,9 +297,56 @@ object ReplayGainScanner {
                 trackPeak = finalMeta.trackPeak,
                 computedLoudnessDb = finalMeta.computedLoudnessDb
             )
-            persistCache(context)
+            if (!deferPersist) persistCache(context)
         }
         finalMeta
+    }
+
+    private fun analyzeViaNativeContainerDecoder(file: File): Pair<Float, Float>? {
+        var raf: RandomAccessFile? = null
+        return try {
+            raf = RandomAccessFile(file, "r")
+            val fileRef = raf
+            val reader = object : SeekableByteReader {
+                override val length: Long get() = fileRef.length()
+                override var position: Long
+                    get() = fileRef.filePointer
+                    set(value) { fileRef.seek(value.coerceAtLeast(0L)) }
+                override fun read(buffer: ByteArray, offset: Int, count: Int): Int =
+                    fileRef.read(buffer, offset, count)
+                override fun close() = runCatching { fileRef.close() }.let {}
+            }
+            val decoded = NativePcmContainerDecoder.open(reader) ?: return null
+            try {
+                val outRate = decoded.outputSampleRate
+                val windowBytes = (outRate * 4 * 15) / 100 // ~150 ms stereo s16le per seek point
+                val collector = ByteArrayOutputStream(windowBytes * 3)
+                val scratch = ByteArray(8192)
+                val dur = decoded.durationMs
+                val seekPoints = if (dur > 12_000L) {
+                    longArrayOf((dur * 0.25).toLong(), (dur * 0.52).toLong(), (dur * 0.76).toLong())
+                } else {
+                    longArrayOf((dur * 0.35).toLong())
+                }
+                for (pt in seekPoints) {
+                    decoded.seekToMs(pt)
+                    var gotWindow = 0
+                    while (gotWindow < windowBytes) {
+                        val n = decoded.readStereoS16le(scratch, 0, minOf(scratch.size, windowBytes - gotWindow))
+                        if (n <= 0) break
+                        collector.write(scratch, 0, n)
+                        gotWindow += n
+                    }
+                }
+                val pcm = collector.toByteArray()
+                ReplayGainEngine.estimateGainFromPcm16le(pcm, pcm.size, channels = 2, sampleRateHz = outRate)
+            } finally {
+                decoded.close()
+            }
+        } catch (_: Exception) {
+            runCatching { raf?.close() }
+            null
+        }
     }
 
     private fun analyzeSparseLoudness(context: Context, song: Song): Pair<Float, Float>? {
@@ -244,6 +403,7 @@ object ReplayGainScanner {
                 longArrayOf((durationUs * 0.4).toLong())
             }
 
+            val chunkReusable = ByteArray(16384)
             val bufferInfo = MediaCodec.BufferInfo()
             for (seekUs in seekPointsUs) {
                 extractor.seekTo(seekUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
@@ -277,9 +437,13 @@ object ReplayGainScanner {
                         if (outBuf != null && bufferInfo.size > 0) {
                             outBuf.position(bufferInfo.offset)
                             outBuf.limit(bufferInfo.offset + bufferInfo.size)
-                            val chunk = ByteArray(bufferInfo.size)
-                            outBuf.get(chunk)
-                            pcmCollector.write(chunk)
+                            var rem = bufferInfo.size
+                            while (rem > 0) {
+                                val step = minOf(rem, chunkReusable.size)
+                                outBuf.get(chunkReusable, 0, step)
+                                pcmCollector.write(chunkReusable, 0, step)
+                                rem -= step
+                            }
                             collectedForWindow += bufferInfo.size
                         }
                         codec.releaseOutputBuffer(outIdx, false)
@@ -289,7 +453,12 @@ object ReplayGainScanner {
             }
 
             val pcmBytes = pcmCollector.toByteArray()
-            ReplayGainEngine.estimateGainFromPcm16le(pcmBytes, pcmBytes.size, channels)
+            ReplayGainEngine.estimateGainFromPcm16le(
+                pcmBytes = pcmBytes,
+                validLength = pcmBytes.size,
+                channels = channels,
+                sampleRateHz = sampleRate
+            )
         } catch (_: Exception) {
             null
         } finally {

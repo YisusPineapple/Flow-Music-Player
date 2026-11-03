@@ -27,8 +27,8 @@ object AudioFormatRegistry {
     )
 
     private val EXTENDED_DECODER_EXTENSIONS: Set<String> = setOf(
-        "alac", "aiff", "aif", "aifc", "ape", "wv", "dsf", "dff", "caf",
-        "eac3", "ec3", "ac3", "ac4", "dts",
+        "alac", "aiff", "aif", "aifc", "ape", "wv", "dsf", "dff", "caf", "au", "snd", "pcm",
+        "eac3", "ec3", "ac3", "ac4", "dts", "wma",
         "mkv", "mka", "mp4", "webm", "ts", "mts", "avi", "mov"
     )
 

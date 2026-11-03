@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">Settings</string>
     <string name="about">About</string>
     <string name="version">Version</string>
@@ -54,7 +54,7 @@
     <string name="tab_genres">Genres</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">Lune AI Core</string>
+    <string name="ai_core_title">Flow AI Core</string>
     <string name="ai_musical_intelligence">Musical Intelligence</string>
     <string name="ai_local_learning_desc">100% offline &amp; private learning</string>
     <string name="ai_affinity_flow">Library flow &amp; affinity</string>
@@ -156,6 +156,7 @@
     <string name="lang_russian">Russian</string>
     <string name="lang_persian">Persian</string>
     <string name="lang_arabic">Arabic</string>
+    <string name="lang_polish">Polish</string>
 
     <string name="ok">OK</string>
     <string name="cd_activate_eq">Activate EQ</string>
@@ -275,7 +276,7 @@
     <string name="visualizer_mini_player">Show in Mini Player</string>
     <string name="credits">Credits</string>
     <string name="credits_desc">Testing, design suggestions, and logo</string>
-    <string name="creator_desc">Creator and maintainer of lune music player</string>
+    <string name="creator_desc">Original creator of Lune Music Player (upstream base of Flow)</string>
     <string name="gesture">Gesture</string>
     <string name="gesture_desc">Customize the app gestures</string>
     <string name="enable_gestures">Enable gestures</string>
@@ -338,7 +339,7 @@
     <string name="filter_scope_albums">Albums</string>
     <string name="filter_all_albums">All Albums</string>
     <string name="backup_warning_title">Important Notice</string>
-    <string name="backup_warning_desc">Lune only imports playlists pre-exported by this application. Ensure you have the corresponding music files stored on this device for proper playback.</string>
+    <string name="backup_warning_desc">Flow imports playlists exported by Flow or Lune. Ensure you have the corresponding music files stored on this device for proper playback.</string>
     <string name="export_playlists">Export Playlists</string>
     <string name="export_playlists_desc">Save your playlists to a file</string>
     <string name="import_playlists">Import Playlists</string>
@@ -385,8 +386,8 @@
     <string name="onboarding_perm_music_title">Music &amp; Audio</string>
     <string name="onboarding_perm_music_desc">Essential to scan, index, and playback your music collection stored on this device.</string>
     <string name="onboarding_perm_manage_files_title">Music Folder Access</string>
-    <string name="onboarding_perm_manage_files_desc">Select your music folder to allow Lune to organize and manage your library safely.</string>
-    <string name="onboarding_welcome_back">Welcome to Lune</string>
+    <string name="onboarding_perm_manage_files_desc">Select your music folder to allow Flow to organize and manage your library safely.</string>
+    <string name="onboarding_welcome_back">Welcome to Flow</string>
     <string name="onboarding_listen_style">Listen with style</string>
     <string name="onboarding_feature_hifi">HiFi Audio Support</string>
 
@@ -400,10 +401,10 @@
     <string name="onboarding_reminder_desc">If you skipped any permission, you can easily enable it later in Settings > Security > Permissions.</string>
     <string name="onboarding_reminder_button">Got it</string>
     <string name="onboarding_folder_visibility_title">Folder Visibility</string>
-    <string name="onboarding_folder_visibility_desc">By default, Lune will only show songs from your selected music folder. Enable this option to show all music folders on your device from the start.</string>
+    <string name="onboarding_folder_visibility_desc">By default, Flow will only show songs from your selected music folder. Enable this option to show all music folders on your device from the start.</string>
     <string name="onboarding_folder_visibility_label">Show all folders</string>
     <string name="onboarding_support_title">Support the Project</string>
-    <string name="onboarding_support_desc">If you enjoy Lune, consider supporting us through the Donate section in Settings > About. Every contribution helps keep the app growing!</string>
+    <string name="onboarding_support_desc">Flow is an open-source fork of Lune. Consider supporting the original upstream project via Settings > About!</string>
     <string name="search_play_all">Play</string>
     <string name="search_shuffle">Shuffle</string>
     <string name="playing_from">Playing from: %s</string>
@@ -455,9 +456,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">Quick Play</string>
-    <string name="open_in_lune">Open in Lune</string>
+    <string name="open_in_lune">Open in Flow</string>
     <string name="close">Close</string>
-    <string name="cd_open_in_lune">Open in Lune</string>
+    <string name="cd_open_in_lune">Open in Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">Edit Lyrics</string>
@@ -500,7 +501,7 @@
     <string name="remove_playlist_cover">Reset cover</string>
     <string name="playlist_cover_updated">Playlist cover updated</string>
     <string name="metadata_saved_file">Tags written directly to audio file</string>
-    <string name="metadata_saved_local_fallback">Saved locally in Lune (file is read-only)</string>
+    <string name="metadata_saved_local_fallback">Saved locally in Flow (file is read-only)</string>
     <string name="metadata_permission_needed">Grant file access to save tags permanently</string>
 
     <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
@@ -524,7 +525,7 @@
     <string name="gapless_audio_desc">Zero-silence sample-accurate transitions between tracks</string>
     <string name="gapless_album_priority">Prioritize Gapless on Sequential Albums</string>
     <string name="gapless_album_priority_desc">Automatically use Gapless instead of Crossfade when playing consecutive tracks of the same album</string>
-    <string name="extended_formats_supported">Supported formats: ALAC, AIFF, FLAC, WAV, APE, WavPack, DSD, M4A, MP4, MKV/MKA, WebM, Opus (Stereo &amp; 5.1/7.1), E-AC3, AC-4, OGG, MP3</string>
+    <string name="extended_formats_supported">Supported formats: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Stereo &amp; 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
 
     <string name="multitag_title">Multi-Artist, Multi-Genre &amp; Whitelist</string>
     <string name="multitag_desc">Configure artist/genre separators, title feat. extraction, and protected band names</string>
@@ -534,7 +535,7 @@
     <string name="enable_multi_genre_desc">Assign tracks to multiple genres at once</string>
     <string name="split_semicolon">Semicolon (;)</string>
     <string name="split_comma">Comma (,)</string>
-    <string name="split_slash">Slash (/ | \)</string>
+    <string name="split_slash">Slash (/ | \\)</string>
     <string name="split_ampersand">Ampersand (&amp;)</string>
     <string name="split_feat_keywords">Connectors (ft., feat., con, with, vs., x)</string>
     <string name="extract_artists_from_title">Extract Featured Artists from Title</string>
@@ -572,15 +573,15 @@
     <string name="ui_density_spacious">Spacious</string>
     <string name="replaygain_mode_title">Normalization Mode</string>
     <string name="replaygain_mode_desc">Maintain uniform volume across tracks using ReplayGain/R128 tags or lightweight RMS/LUFS analysis</string>
-    <string name="replaygain_rms_fallback">Smart RMS/LUFS Fallback</string>
-    <string name="replaygain_rms_fallback_desc">Automatically analyze untagged tracks with ultra-low CPU sparse PCM sampling</string>
-    <string name="replaygain_badge_player">Show ReplayGain dB badge in player</string>
+    <string name="replaygain_rms_fallback">Real-Time LUFS / RMS Analysis</string>
+    <string name="replaygain_rms_fallback_desc">Calculate K-weighted LUFS &amp; peak gain in real time for tracks without ReplayGain/R128 tags</string>
+    <string name="replaygain_badge_player">Show ReplayGain / LUFS dB badge in player</string>
     <string name="gapless_playback">True Gapless Playback</string>
     <string name="gapless_playback_desc">Sample-accurate zero-gap transitions between tracks</string>
     <string name="gapless_smart_album">Respect Gapless on Continuous Albums</string>
     <string name="gapless_smart_album_desc">Bypass Crossfade automatically when playing consecutive tracks of the same album</string>
     <string name="extended_formats_title">Extended Audio &amp; Multichannel Formats</string>
-    <string name="extended_formats_desc">Native support for ALAC, AIFF, FLAC, WAV, APE, WavPack, DSD, M4A, MP4, MKV/MKA, WebM, Opus (Stereo &amp; 5.1/7.1), E-AC3, and AC-4</string>
+    <string name="extended_formats_desc">Compatible on Android &amp; PC: ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM, Opus (Stereo &amp; 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF, FLAC, WAV, OGG, AAC, MP3</string>
     <string name="multitag_section">Multi-Artist, Multi-Genre &amp; Whitelist</string>
     <string name="multitag_separators_title">Active Separators</string>
     <string name="whitelist_manage">Protected Whitelist (Never Split)</string>
@@ -592,4 +593,11 @@
     <string name="perf_mode_ultra_saver_desc">Minimal RAM &amp; zero GPU blurs/animations for ultra-modest 1–2 core devices</string>
     <string name="perf_mode_light_desc">Disables real-time blur shaders and continuous animations for smooth 60 FPS</string>
     <string name="perf_mode_full_desc">Enables all visual effects, dynamic blurs, and animations</string>
+    <string name="fork_attribution_title">Open-Source Fork of Lune</string>
+    <string name="fork_attribution_desc">Flow is a multiplatform (Android, Windows &amp; Linux) audiophile fork of Lune (https://github.com/MrDemonc/Lune) created by MrDemonc, optimized for ultra-low RAM/CPU usage, real-time LUFS normalization, Gapless playback, and extended codecs under GPLv3.</string>
+    <string name="fork_open_original_repo">Original Lune Repository (GitHub)</string>
+    <string name="analyze_library_lufs">Analyze Library Loudness (LUFS)</string>
+    <string name="analyze_library_lufs_desc">Pre-compute ITU-R BS.1770 LUFS gain for untagged tracks in the background</string>
+    <string name="analyzing_library_progress">Analyzing LUFS loudness: %1$d / %2$d tracks…</string>
+    <string name="library_scan_progress">Indexing library &amp; extended codecs (%1$d tracks)…</string>
 </resources>

@@ -106,7 +106,7 @@ dependencies {
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.extractor)
-    implementation(libs.androidx.media3.session)
+    // implementation(libs.androidx.media3.session) // Replaced by lightweight androidx.media MediaSessionCompat
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

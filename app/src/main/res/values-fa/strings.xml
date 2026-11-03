@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">تنظیمات</string>
     <string name="about">درباره ما</string>
     <string name="version">ورژن</string>
@@ -54,7 +54,7 @@
     <string name="tab_genres">سبک‌ها</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">هسته Lune AI</string>
+    <string name="ai_core_title">هسته Flow AI</string>
     <string name="ai_musical_intelligence">هوشمندی موسیقی</string>
     <string name="ai_local_learning_desc">یادگیری ۱۰۰٪ آفلاین و خصوصی</string>
     <string name="ai_affinity_flow">جریان و تناسب موسیقی‌ها</string>
@@ -264,7 +264,7 @@
     <string name="visualizer_mini_player">نشون دادن تو مینی‌پلیر</string>
     <string name="credits">دم این بچه‌ها گرم</string>
     <string name="credits_desc">کسایی که تو تست، طراحی و لوگو کمک کردن</string>
-    <string name="creator_desc">کدنویس و خالق اصلی اپ Lune</string>
+    <string name="creator_desc">خالق اصلی موزیک‌پلیر Lune (پایه پروژه Flow)</string>
     <string name="gesture">ژست‌های حرکتی</string>
     <string name="gesture_desc">سوایپ و ژست‌ها رو تنظیم کن</string>
     <string name="enable_gestures">روشن کردن ژست‌های حرکتی</string>
@@ -433,9 +433,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">پخش سریع</string>
-    <string name="open_in_lune">باز کردن در Lune</string>
+    <string name="open_in_lune">باز کردن در Flow</string>
     <string name="close">بستن</string>
-    <string name="cd_open_in_lune">باز کردن در Lune</string>
+    <string name="cd_open_in_lune">باز کردن در Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">ویرایش متن آهنگ</string>
@@ -459,4 +459,122 @@
     <string name="auto_sync_backup">همگام‌سازی خودکار بکاپ</string>
     <string name="auto_sync_backup_desc">با تغییر پلی‌لیست‌ها یا متن‌ها، فایل بکاپ به طور خودکار بروزرسانی میشه</string>
     <string name="auto_sync_requires_export">واسه فعال کردن این بخش، اول باید یه خروجی بگیری</string>
+
+    <!-- Studio Crossfade, Automix, Blacklist, Covers & Metadata -->
+    <string name="adaptive_crossfade">مدت زمان هوشمند با AI</string>
+    <string name="adaptive_crossfade_desc">تنظیم خودکار طول کراس‌فید بر اساس انرژی و سبک آهنگ</string>
+    <string name="crossfade_silence_detection">حذف هوشمند سکوت انتهای آهنگ</string>
+    <string name="crossfade_silence_detection_desc">شروع زودتر انتقال هنگام تشخیص سکوت یا افت انرژی در انتهای آهنگ</string>
+    <string name="go_to_album">رفتن به آلبوم</string>
+    <string name="blacklist_song">مخفی کردن آهنگ (لیست سیاه)</string>
+    <string name="song_blacklisted_toast">آهنگ مخفی شد و به لیست سیاه رفت</string>
+    <string name="manage_blacklist">لیست سیاه و موارد مخفی</string>
+    <string name="manage_blacklist_desc">مدیریت آهنگ‌های مخفی و پوشه‌های استثنا شده</string>
+    <string name="blacklisted_songs">آهنگ‌های مخفی</string>
+    <string name="blacklisted_folders">پوشه‌های مخفی</string>
+    <string name="blacklist_empty">هیچ آهنگ یا پوشه مخفی وجود ندارد</string>
+    <string name="restore_item">بازگردانی</string>
+    <string name="change_playlist_cover">تغییر کاور</string>
+    <string name="remove_playlist_cover">ریست کاور</string>
+    <string name="playlist_cover_updated">کاور پلی‌لیست بروزرسانی شد</string>
+    <string name="metadata_saved_file">تگ‌ها مستقیماً داخل فایل صوتی ذخیره شدند</string>
+    <string name="metadata_saved_local_fallback">ذخیره محلی در Flow (فایل فقط خواندنی است)</string>
+    <string name="metadata_permission_needed">برای ذخیره دائمی تگ‌ها دسترسی فایل را بدهید</string>
+
+    <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
+    <string name="replaygain_section">ReplayGain و یکسان‌سازی بلندی صدا</string>
+    <string name="replaygain_desc">حفظ حجم صدای یکنواخت بین آهنگ‌ها با تگ‌ها یا تحلیل زنده RMS/LUFS</string>
+    <string name="replaygain_mode_off">خاموش</string>
+    <string name="replaygain_mode_track">تک‌آهنگ</string>
+    <string name="replaygain_mode_album">آلبوم</string>
+    <string name="replaygain_mode_smart">آلبوم هوشمند</string>
+    <string name="replaygain_preamp_tagged">پیش‌تقویت (دارای تگ)</string>
+    <string name="replaygain_preamp_untagged">پیش‌تقویت (بدون تگ)</string>
+    <string name="replaygain_fallback_analysis">تحلیل هوشمند RMS/LUFS</string>
+    <string name="replaygain_fallback_analysis_desc">محاسبه بلندی صدا برای آهنگ‌های فاقد تگ ReplayGain یا R128</string>
+    <string name="replaygain_prevent_clipping">محدودکننده پیک (ضد دیستورشن)</string>
+    <string name="replaygain_prevent_clipping_desc">محدود کردن خودکار تقویت مثبت برای جلوگیری از خراب شدن صدا</string>
+    <string name="show_replaygain_badge">نمایش نشان ReplayGain در پلیر</string>
+    <string name="show_replaygain_badge_desc">نمایش میزان تنظیم dB کنار نشان کیفیت صدا</string>
+
+    <string name="gapless_section">پخش بدون وقفه (Gapless) و فرمت‌های پیشرفته</string>
+    <string name="gapless_audio">پخش واقعی بدون مکث (Gapless)</string>
+    <string name="gapless_audio_desc">انتقال دقیق بدون کوچک‌ترین سکوت بین ترک‌ها</string>
+    <string name="gapless_album_priority">اولویت Gapless در آلبوم‌های پشت سر هم</string>
+    <string name="gapless_album_priority_desc">استفاده خودکار از Gapless به جای کراس‌فید هنگام پخش ترتیبی یک آلبوم</string>
+    <string name="extended_formats_supported">فرمت‌های پشتیبانی‌شده: ALAC، AIFF/AIF، APE، WavPack (WV)، DSD (DSF/DFF)، M4A، MP4، MKV/MKA، WebM، Opus (استریو و 5.1/7.1)، E-AC3، AC-3، AC-4، DTS، WMA، CAF، FLAC، WAV، OGG، AAC، MP3</string>
+
+    <string name="multitag_title">چند خواننده، چند سبک و لیست سفید</string>
+    <string name="multitag_desc">تنظیم جداکننده‌ها، استخراج feat. از عنوان آهنگ و محافظت از نام گروه‌ها</string>
+    <string name="enable_multi_artist">تفکیک چند خواننده</string>
+    <string name="enable_multi_artist_desc">نمایش آهنگ زیر نام تک‌تک خوانندگان همکار</string>
+    <string name="enable_multi_genre">تفکیک چند سبک</string>
+    <string name="enable_multi_genre_desc">اختصاص همزمان یک آهنگ به چند سبک موسیقی</string>
+    <string name="split_semicolon">نقطه‌ویرگول (;)</string>
+    <string name="split_comma">ویرگول (,)</string>
+    <string name="split_slash">اسلش (/ | \\)</string>
+    <string name="split_ampersand">علامت &amp;</string>
+    <string name="split_feat_keywords">کلمات همکاری (ft., feat., con, with, vs., x)</string>
+    <string name="extract_artists_from_title">استخراج خواننده مهمان از عنوان آهنگ</string>
+    <string name="extract_artists_from_title_desc">تشخیص (ft. خواننده) یا [feat. خواننده] در نام آهنگ بدون تداخل</string>
+    <string name="clean_feat_from_title">مخفی کردن (ft. …) استخراج‌شده از عنوان</string>
+    <string name="clean_feat_from_title_desc">تمیز نگه داشتن نام آهنگ در حین ثبت خوانندگان مهمان</string>
+    <string name="whitelist_section">لیست سفید محافظت‌شده (جدا نشود)</string>
+    <string name="whitelist_desc">نام‌هایی مثل AC/DC، Tyler, The Creator یا R&amp;B تکه نمی‌شوند. موارد دلخواه را اضافه کنید:</string>
+    <string name="whitelist_input_hint">افزودن خواننده یا سبک (مثلاً Simon &amp; Garfunkel)</string>
+    <string name="whitelist_add">محافظت</string>
+    <string name="whitelist_protect_chip">افزودن به لیست سفید</string>
+    <string name="whitelist_default_badge">نام‌های محافظت‌شده پیش‌فرض</string>
+    <string name="choose_artist">انتخاب خواننده</string>
+    <string name="parsed_artists_preview">خوانندگان شناسایی‌شده</string>
+    <string name="parsed_genres_preview">سبک‌های شناسایی‌شده</string>
+
+    <string name="performance_profile_title">حالت بهینه‌سازی و مصرف منابع</string>
+    <string name="performance_profile_desc">کاهش مصرف پردازنده، رم و گرافیک برای گوشی‌ها و کامپیوترهای ضعیف یا قدیمی</string>
+    <string name="perf_mode_auto">خودکار</string>
+    <string name="perf_mode_ultra_saver">فوق کم‌مصرف</string>
+    <string name="perf_mode_light">سبک</string>
+    <string name="perf_mode_full">جلوه‌های کامل</string>
+    <string name="perf_mode_auto_hint">تشخیص خودکار سخت‌افزار ضعیف یا رم کم و حذف بلرهای سنگین با حفظ ۱۰۰٪ کیفیت صدا</string>
+
+    <string name="adaptive_ui_section">تطبیق‌پذیری صفحه و تراکم رابط</string>
+    <string name="ui_density_title">تراکم رابط کاربری</string>
+    <string name="ui_density_compact">فشرده</string>
+    <string name="ui_density_standard">استاندارد</string>
+    <string name="ui_density_comfortable">باز</string>
+    <string name="ui_font_scale_title">اندازه متن</string>
+    <string name="grid_columns_title">ستون‌های شبکه</string>
+    <string name="grid_columns_auto">خودکار</string>
+    <string name="grid_columns_desc">تنظیم خودکار ستون‌ها بر اساس ابعاد صفحه یا انتخاب عدد ثابت</string>
+    <string name="ui_density_desc">تنظیم فاصله‌ها و اندازه کارت‌ها برای هر نوع صفحه‌نمایش</string>
+    <string name="ui_density_spacious">جادار</string>
+    <string name="replaygain_mode_title">حالت نرمال‌سازی صدا</string>
+    <string name="replaygain_mode_desc">حفظ صدای یکسان بین ترک‌ها با تگ‌های ReplayGain/R128 یا تحلیل سبک RMS/LUFS</string>
+    <string name="replaygain_rms_fallback">تحلیل زنده LUFS / RMS</string>
+    <string name="replaygain_rms_fallback_desc">محاسبه بلندی LUFS استاندارد و پیک صدا در لحظه برای آهنگ‌های بدون تگ</string>
+    <string name="replaygain_badge_player">نمایش نشان ReplayGain / LUFS dB در پلیر</string>
+    <string name="gapless_playback">پخش واقعی بدون مکث (Gapless)</string>
+    <string name="gapless_playback_desc">پخش پیوسته ترک‌ها بدون کوچک‌ترین فاصله</string>
+    <string name="gapless_smart_album">رعایت Gapless در آلبوم‌های پیوسته</string>
+    <string name="gapless_smart_album_desc">لغو خودکار کراس‌فید هنگام پخش پشت سر هم آهنگ‌های یک آلبوم</string>
+    <string name="extended_formats_title">فرمت‌های صوتی پیشرفته و چندکاناله</string>
+    <string name="extended_formats_desc">سازگار در اندروید و کامپیوتر: ALAC، AIFF/AIF، APE، WavPack (WV)، DSD (DSF/DFF)، M4A، MP4، MKV/MKA، WebM، Opus (استریو و 5.1/7.1)، E-AC3، AC-3، AC-4، DTS، WMA، CAF، FLAC، WAV، OGG، AAC، MP3</string>
+    <string name="multitag_section">چند خواننده، چند سبک و لیست سفید</string>
+    <string name="multitag_separators_title">جداکننده‌های فعال</string>
+    <string name="whitelist_manage">لیست سفید محافظت‌شده (جدا نشود)</string>
+    <string name="whitelist_manage_desc">خواننده‌ها و سبک‌های این لیست (مثل AC/DC، Tyler, The Creator، R&amp;B) هرگز تکه نمی‌شوند</string>
+    <string name="whitelist_add_hint">افزودن خواننده یا سبک (مثلاً Wisin &amp; Yandel)</string>
+    <string name="whitelist_add_button">افزودن به لیست سفید</string>
+    <string name="whitelist_defaults_info">نام‌های محافظت‌شده داخلی</string>
+    <string name="whitelist_added_toast">«%1$s» در لیست سفید محافظت شد</string>
+    <string name="perf_mode_ultra_saver_desc">حداقل مصرف رم و حذف کامل بلر و انیمیشن برای دستگاه‌های ۱ تا ۲ هسته‌ای</string>
+    <string name="perf_mode_light_desc">غیرفعال کردن بلر زنده و انیمیشن‌های مداوم برای اجرای روان ۶۰ فریم</string>
+    <string name="perf_mode_full_desc">فعال‌سازی تمام جلوه‌های بصری، بلر پویا و انیمیشن‌ها</string>
+    <string name="fork_attribution_title">فورک متن‌باز از پروژه Lune</string>
+    <string name="fork_attribution_desc">اپلیکیشن Flow یک فورک چندسکویی (اندروید، ویندوز و لینوکس) و حرفه‌ای از پروژه Lune (https://github.com/MrDemonc/Lune) ساخته MrDemonc تحت مجوز GPLv3 است که برای مصرف فوق‌العاده کم رم و پردازنده، نرمال‌سازی زنده LUFS، پخش بدون وقفه و کدک‌های پیشرفته بهینه‌سازی شده است.</string>
+    <string name="fork_open_original_repo">مخزن اصلی Lune در گیت‌هاب</string>
+    <string name="analyze_library_lufs">تحلیل بلندی صدای کتابخانه (LUFS)</string>
+    <string name="analyze_library_lufs_desc">محاسبه پس‌زمینه بهره ITU-R BS.1770 LUFS برای آهنگ‌های بدون تگ</string>
+    <string name="analyzing_library_progress">در حال تحلیل بلندی LUFS: %1$d از %2$d آهنگ…</string>
+    <string name="library_scan_progress">در حال فهرست‌بندی کتابخانه و کدک‌ها (%1$d آهنگ)…</string>
 </resources>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Lune</string>
+    <string name="app_name">Flow</string>
     <string name="settings">الإعدادات</string>
     <string name="about">حول</string>
     <string name="version">الإصدار</string>
@@ -54,7 +54,7 @@
     <string name="tab_genres">الأنواع</string>
 
     <!-- AI Mixes & Intelligence Section -->
-    <string name="ai_core_title">نواة Lune AI</string>
+    <string name="ai_core_title">نواة Flow AI</string>
     <string name="ai_musical_intelligence">الذكاء الموسيقي</string>
     <string name="ai_local_learning_desc">تعلم محلي 100% وخاص بدون إنترنت</string>
     <string name="ai_affinity_flow">انسجام وتناغم المكتبة</string>
@@ -264,7 +264,7 @@
     <string name="visualizer_mini_player">إظهار في المشغل المصغر</string>
     <string name="credits">الاعتمادات</string>
     <string name="credits_desc">الاختبار، اقتراحات التصميم، والشعار</string>
-    <string name="creator_desc">منشئ ومشرف مشغل الموسيقى Lune</string>
+    <string name="creator_desc">المبتكر الأصلي لمشغل Lune (المشروع الأساسي لـ Flow)</string>
     <string name="gesture">الإيماءات</string>
     <string name="gesture_desc">تخصيص إيماءات التطبيق</string>
     <string name="enable_gestures">تفعيل الإيماءات</string>
@@ -320,7 +320,7 @@
     <string name="sort_duration">المدة</string>
     <string name="sort_date_added">تاريخ الإضافة</string>
     <string name="backup_warning_title">ملاحظة هامة</string>
-    <string name="backup_warning_desc">يقوم Lune فقط باستيراد قوائم التشغيل التي تم تصديرها مسبقًا بواسطة هذا التطبيق. تأكد من تخزين ملفات الموسيقى المطابقة على هذا الجهاز لضمان التشغيل السليم.</string>
+    <string name="backup_warning_desc">يقوم Flow باستيراد قوائم التشغيل المصدّرة مسبقًا بواسطة هذا التطبيق (ومتوافق مع نسخ Lune الاحتياطية). تأكد من وجود ملفات الموسيقى المطابقة على هذا الجهاز.</string>
     <string name="export_playlists">تصدير قوائم التشغيل</string>
     <string name="export_playlists_desc">حفظ قوائم التشغيل الخاصة بك في ملف</string>
     <string name="import_playlists">استيراد قوائم التشغيل</string>
@@ -367,8 +367,8 @@
     <string name="onboarding_perm_music_title">الموسيقى والصوت</string>
     <string name="onboarding_perm_music_desc">أساسي لفحص وفهرسة وتشغيل مجموعة الموسيقى المخزنة على هذا الجهاز.</string>
     <string name="onboarding_perm_manage_files_title">الوصول إلى مجلد الموسيقى</string>
-    <string name="onboarding_perm_manage_files_desc">حدد مجلد الموسيقى الخاص بك للسماح لـ Lune بتنظيم وإدارة مكتبتك بأمان.</string>
-    <string name="onboarding_welcome_back">مرحبًا بك في Lune</string>
+    <string name="onboarding_perm_manage_files_desc">حدد مجلد الموسيقى الخاص بك للسماح لـ Flow بتنظيم وإدارة مكتبتك بأمان.</string>
+    <string name="onboarding_welcome_back">مرحبًا بك في Flow</string>
     <string name="onboarding_listen_style">استمع بأناقة</string>
     <string name="onboarding_feature_hifi">دعم صوت HiFi</string>
 
@@ -382,10 +382,10 @@
     <string name="onboarding_reminder_desc">إذا تخطيت أي إذن، يمكنك تفعيله بسهولة لاحقاً من الإعدادات > الأمان > الأذونات.</string>
     <string name="onboarding_reminder_button">فهمت</string>
     <string name="onboarding_folder_visibility_title">رؤية المجلدات</string>
-    <string name="onboarding_folder_visibility_desc">بشكل افتراضي، سيعرض Lune الأغاني من مجلد الموسيقى المحدد فقط. قم بتفعيل هذا الخيار لإظهار جميع مجلدات الموسيقى على جهازك منذ البداية.</string>
+    <string name="onboarding_folder_visibility_desc">بشكل افتراضي، سيعرض Flow الأغاني من مجلد الموسيقى المحدد فقط. قم بتفعيل هذا الخيار لإظهار جميع مجلدات الموسيقى على جهازك منذ البداية.</string>
     <string name="onboarding_folder_visibility_label">إظهار جميع المجلدات</string>
     <string name="onboarding_support_title">ادعم المشروع</string>
-    <string name="onboarding_support_desc">إذا كنت تستمتع بـ Lune، فكر في دعمنا من خلال قسم التبرع في الإعدادات > حول. كل مساهمة تساعد في استمرار نمو التطبيق!</string>
+    <string name="onboarding_support_desc">إذا كنت تستمتع بـ Flow، فكر في دعم المشروع من خلال قسم التبرع في الإعدادات &gt; حول. كل مساهمة تساعد في استمرار التطوير!</string>
     <string name="search_play_all">تشغيل</string>
     <string name="search_shuffle">عشوائي</string>
     <string name="playing_from">يتم التشغيل من: %s</string>
@@ -435,9 +435,9 @@
 
     <!-- Quick Player -->
     <string name="quick_player">تشغيل سريع</string>
-    <string name="open_in_lune">فتح في Lune</string>
+    <string name="open_in_lune">فتح في Flow</string>
     <string name="close">إغلاق</string>
-    <string name="cd_open_in_lune">فتح في Lune</string>
+    <string name="cd_open_in_lune">فتح في Flow</string>
 
     <!-- Lyrics Editor & Backup Auto-Sync -->
     <string name="edit_lyrics">تعديل الكلمات</string>
@@ -461,4 +461,122 @@
     <string name="auto_sync_backup">مزامنة النسخ الاحتياطي تلقائياً</string>
     <string name="auto_sync_backup_desc">تحديث النسخة الاحتياطية المصدرة تلقائياً عند تغيير القوائم أو الكلمات</string>
     <string name="auto_sync_requires_export">قم بتصدير نسخة احتياطية أولاً لتفعيل المزامنة التلقائية</string>
+
+    <!-- Studio Crossfade, Automix, Blacklist, Covers & Metadata -->
+    <string name="adaptive_crossfade">مدة متكيفة بالذكاء الاصطناعي</string>
+    <string name="adaptive_crossfade_desc">ضبط مدة التداخل الصوتي تلقائياً حسب طاقة المقطع ونمطه</string>
+    <string name="crossfade_silence_detection">قص الصمت الختامي الذكي</string>
+    <string name="crossfade_silence_detection_desc">بدء الانتقال مبكراً عند اكتشاف صمت أو تلاشي الطاقة في نهاية المقطع</string>
+    <string name="go_to_album">الانتقال إلى الألبوم</string>
+    <string name="blacklist_song">إخفاء الأغنية (القائمة السوداء)</string>
+    <string name="song_blacklisted_toast">تم إخفاء الأغنية وإضافتها إلى القائمة السوداء</string>
+    <string name="manage_blacklist">القائمة السوداء والعناصر المخفية</string>
+    <string name="manage_blacklist_desc">إدارة الأغاني المخفية والمجلدات المستبعدة</string>
+    <string name="blacklisted_songs">الأغاني المخفية</string>
+    <string name="blacklisted_folders">المجلدات المخفية</string>
+    <string name="blacklist_empty">لا توجد أغانٍ أو مجلدات مخفية</string>
+    <string name="restore_item">استعادة</string>
+    <string name="change_playlist_cover">تغيير الغلاف</string>
+    <string name="remove_playlist_cover">إعادة تعيين الغلاف</string>
+    <string name="playlist_cover_updated">تم تحديث غلاف قائمة التشغيل</string>
+    <string name="metadata_saved_file">تمت كتابة الوسوم مباشرة في الملف الصوتي</string>
+    <string name="metadata_saved_local_fallback">تم الحفظ محلياً في Flow (الملف للقراءة فقط)</string>
+    <string name="metadata_permission_needed">امنح إذن الوصول للملف لحفظ الوسوم بشكل دائم</string>
+
+    <!-- ReplayGain, Gapless, Multi-Artist/Genre, Performance & Universal Adaptive UI -->
+    <string name="replaygain_section">ReplayGain وتوحيد مستوى الصوت</string>
+    <string name="replaygain_desc">الحفاظ على مستوى صوت متسق عبر المقاطع باستخدام الوسوم أو تحليل RMS/LUFS الفوري</string>
+    <string name="replaygain_mode_off">إيقاف</string>
+    <string name="replaygain_mode_track">مقطع</string>
+    <string name="replaygain_mode_album">ألبوم</string>
+    <string name="replaygain_mode_smart">ألبوم ذكي</string>
+    <string name="replaygain_preamp_tagged">تضخيم مسبق (بوسوم)</string>
+    <string name="replaygain_preamp_untagged">تضخيم مسبق (بدون وسوم)</string>
+    <string name="replaygain_fallback_analysis">تحليل RMS/LUFS الذكي</string>
+    <string name="replaygain_fallback_analysis_desc">حساب جهارة الصوت للمقاطع التي لا تحتوي على وسوم ReplayGain أو R128</string>
+    <string name="replaygain_prevent_clipping">محدد الذروة لمنع التشويه</string>
+    <string name="replaygain_prevent_clipping_desc">تقييد الكسب الموجب تلقائياً لمنع تشوه الصوت</string>
+    <string name="show_replaygain_badge">إظهار شارة ReplayGain في المشغل</string>
+    <string name="show_replaygain_badge_desc">عرض قيمة موازنة dB المباشرة بجانب شارات جودة الصوت</string>
+
+    <string name="gapless_section">التشغيل المتصل (Gapless) والصيغ الموسعة</string>
+    <string name="gapless_audio">تشغيل متصل حقيقي بدون فجوات</string>
+    <string name="gapless_audio_desc">انتقالات دقيقة على مستوى العينة بدون أي صمت بين المقاطع</string>
+    <string name="gapless_album_priority">أولوية Gapless في الألبومات المتتالية</string>
+    <string name="gapless_album_priority_desc">استخدام التشغيل المتصل تلقائياً بدلاً من التداخل عند تشغيل مقاطع متتالية من نفس الألبوم</string>
+    <string name="extended_formats_supported">الصيغ المدعومة: ALAC، AIFF/AIF، APE، WavPack (WV)، DSD (DSF/DFF)، M4A، MP4، MKV/MKA، WebM، Opus (ستيريو و 5.1/7.1)، E-AC3، AC-3، AC-4، DTS، WMA، CAF، FLAC، WAV، OGG، AAC، MP3</string>
+
+    <string name="multitag_title">تعدد الفنانين والأنواع والقائمة البيضاء</string>
+    <string name="multitag_desc">إعداد فواصل الفنانين/الأنواع واستخراج feat. من العناوين وحماية أسماء الفرق</string>
+    <string name="enable_multi_artist">فهرسة الفنانين المتعددين</string>
+    <string name="enable_multi_artist_desc">إدراج الأغنية تحت كل فنان مشارك على حدة</string>
+    <string name="enable_multi_genre">فهرسة الأنواع المتعددة</string>
+    <string name="enable_multi_genre_desc">ربط المقاطع بعدة أنواع موسيقية في آن واحد</string>
+    <string name="split_semicolon">فاصلة منقوطة (;)</string>
+    <string name="split_comma">فاصلة (,)</string>
+    <string name="split_slash">شرطة مائلة (/ | \\)</string>
+    <string name="split_ampersand">علامة العطف (&amp;)</string>
+    <string name="split_feat_keywords">روابط المشاركة (ft., feat., con, with, vs., x)</string>
+    <string name="extract_artists_from_title">استخراج الفنانين المشاركين من العنوان</string>
+    <string name="extract_artists_from_title_desc">اكتشاف (ft. فنان) أو [feat. فنان] في عناوين الأغاني دون تكرار أو تعارض</string>
+    <string name="clean_feat_from_title">إخفاء (ft. …) المستخرج من العنوان المعروض</string>
+    <string name="clean_feat_from_title_desc">الحفاظ على نظافة عناوين الأغاني مع فهرسة الفنانين المشاركين</string>
+    <string name="whitelist_section">القائمة البيضاء المحمية (عدم الفصل)</string>
+    <string name="whitelist_desc">أسماء مثل AC/DC و Tyler, The Creator و R&amp;B محمية من التقسيم. أضف أسماء مخصصة أدناه:</string>
+    <string name="whitelist_input_hint">أضف فناناً أو نوعاً (مثل Simon &amp; Garfunkel)</string>
+    <string name="whitelist_add">حماية</string>
+    <string name="whitelist_protect_chip">حماية في القائمة البيضاء</string>
+    <string name="whitelist_default_badge">أسماء محمية مدمجة</string>
+    <string name="choose_artist">اختر الفنان</string>
+    <string name="parsed_artists_preview">الفنانون المكتشفون</string>
+    <string name="parsed_genres_preview">الأنواع المكتشفة</string>
+
+    <string name="performance_profile_title">وضع الأداء وتوفير الموارد</string>
+    <string name="performance_profile_desc">تحسين استهلاك المعالج والذاكرة والرسوميات للأجهزة المتواضعة أو القديمة</string>
+    <string name="perf_mode_auto">تلقائي</string>
+    <string name="perf_mode_ultra_saver">توفير فائق</string>
+    <string name="perf_mode_light">خفيف</string>
+    <string name="perf_mode_full">مؤثرات كاملة</string>
+    <string name="perf_mode_auto_hint">يكتشف تلقائياً المعالجات المتواضعة أو الذاكرة المنخفضة ويعطل التمويه الثقيل مع الحفاظ على جودة صوت 100%</string>
+
+    <string name="adaptive_ui_section">تكيف الشاشة وكثافة الواجهة</string>
+    <string name="ui_density_title">كثافة الواجهة</string>
+    <string name="ui_density_compact">مضغوطة</string>
+    <string name="ui_density_standard">قياسية</string>
+    <string name="ui_density_comfortable">مريحة</string>
+    <string name="ui_font_scale_title">حجم النص</string>
+    <string name="grid_columns_title">أعمدة الشبكة</string>
+    <string name="grid_columns_auto">تلقائي</string>
+    <string name="grid_columns_desc">اختيار عدد أعمدة متكيف تلقائياً مع الشاشة أو تثبيت عدد محدد</string>
+    <string name="ui_density_desc">ضبط المسافات وحجم البطاقات لتناسب أي شاشة</string>
+    <string name="ui_density_spacious">واسعة</string>
+    <string name="replaygain_mode_title">وضع توحيد الصوت</string>
+    <string name="replaygain_mode_desc">الحفاظ على مستوى صوت موحد عبر وسوم ReplayGain/R128 أو تحليل RMS/LUFS الخفيف</string>
+    <string name="replaygain_rms_fallback">تحليل LUFS / RMS في الوقت الفعلي</string>
+    <string name="replaygain_rms_fallback_desc">حساب جهارة LUFS الموزونة بـ K والذروة فوراً للمقاطع التي تفتقر لوسوم ReplayGain</string>
+    <string name="replaygain_badge_player">إظهار شارة ReplayGain / LUFS dB في المشغل</string>
+    <string name="gapless_playback">تشغيل متصل حقيقي (Gapless)</string>
+    <string name="gapless_playback_desc">انتقالات سلسة بدون أي فجوة زمنية بين المقاطع</string>
+    <string name="gapless_smart_album">احترام التشغيل المتصل في الألبومات المتسلسلة</string>
+    <string name="gapless_smart_album_desc">تجاوز التداخل الصوتي تلقائياً عند تشغيل مقاطع متتالية من نفس الألبوم</string>
+    <string name="extended_formats_title">صيغ الصوت الموسعة ومتعددة القنوات</string>
+    <string name="extended_formats_desc">متوافق على أندرويد والكمبيوتر: ALAC، AIFF/AIF، APE، WavPack (WV)، DSD (DSF/DFF)، M4A، MP4، MKV/MKA، WebM، Opus (ستيريو و 5.1/7.1)، E-AC3، AC-3، AC-4، DTS، WMA، CAF، FLAC، WAV، OGG، AAC، MP3</string>
+    <string name="multitag_section">تعدد الفنانين والأنواع والقائمة البيضاء</string>
+    <string name="multitag_separators_title">الفواصل النشطة</string>
+    <string name="whitelist_manage">القائمة البيضاء المحمية (عدم الفصل)</string>
+    <string name="whitelist_manage_desc">الفنانون والأنواع في هذه القائمة (مثل AC/DC و Tyler, The Creator و R&amp;B) لا يتم تقسيمهم أبداً</string>
+    <string name="whitelist_add_hint">أضف فناناً أو نوعاً (مثل Wisin &amp; Yandel)</string>
+    <string name="whitelist_add_button">إضافة للقائمة البيضاء</string>
+    <string name="whitelist_defaults_info">الأسماء المحمية المدمجة</string>
+    <string name="whitelist_added_toast">تمت حماية \"%1$s\" في القائمة البيضاء</string>
+    <string name="perf_mode_ultra_saver_desc">أقل استهلاك للذاكرة وبدون تمويه أو حركات رسومية للأجهزة ذات النواة أو النواتين</string>
+    <string name="perf_mode_light_desc">تعطيل تظليل التمويه الفوري والحركات المستمرة لأداء سلس بسرعة 60 إطاراً</string>
+    <string name="perf_mode_full_desc">تفعيل جميع المؤثرات البصرية والتمويه الديناميكي والانتقالات</string>
+    <string name="fork_attribution_title">نسخة مفتوحة المصدر مبنية على Lune</string>
+    <string name="fork_attribution_desc">تطبيق Flow هو نسخة مطورة متعددة المنصات (أندرويد وويندوز ولينكس) مبنية على مشروع Lune (https://github.com/MrDemonc/Lune) للمطور MrDemonc، ومُحسّنة لاستهلاك فائق الانخفاض للذاكرة والمعالج، وموازنة LUFS الفورية، والتشغيل المتصل، والصيغ الصوتية الموسعة بترخيص GPLv3.</string>
+    <string name="fork_open_original_repo">المستودع الأصلي لمشروع Lune (GitHub)</string>
+    <string name="analyze_library_lufs">تحليل جهارة صوت المكتبة (LUFS)</string>
+    <string name="analyze_library_lufs_desc">حساب كسب ITU-R BS.1770 LUFS في الخلفية للمقاطع غير الموسومة</string>
+    <string name="analyzing_library_progress">جارٍ تحليل جهارة LUFS: %1$d / %2$d مقطع…</string>
+    <string name="library_scan_progress">جارٍ فهرسة المكتبة والصيغ الموسعة (%1$d مقطع)…</string>
 </resources>

@@ -101,7 +101,8 @@ fun AboutScreen() {
         2 -> true
         else -> isSystemInDarkTheme()
     }
-    val hasBlurBackground = settingsManager.isBlurEnabled && ((isDarkTheme && settingsManager.isBlurDarkMode) || (!isDarkTheme && settingsManager.isBlurLightMode))
+    val lowResourceVisuals = settingsManager.isLowResourceVisualsActive(context)
+    val hasBlurBackground = !lowResourceVisuals && settingsManager.isBlurEnabled && ((isDarkTheme && settingsManager.isBlurDarkMode) || (!isDarkTheme && settingsManager.isBlurLightMode))
 
     val scrollState = rememberScrollState()
     var showDonateDialog by remember { mutableStateOf(false) }
@@ -159,18 +160,21 @@ fun AboutScreen() {
                 // Logo Section
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(200.dp)
+                    modifier = Modifier.size(188.dp)
                 ) {
-                    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-                    val rotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(durationMillis = 10000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart
-                        ),
-                        label = "diamond_rotation"
-                    )
+                    val rotation = if (!lowResourceVisuals) {
+                        val infiniteTransition = rememberInfiniteTransition(label = "rotation")
+                        val animRot by infiniteTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(durationMillis = 12000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart
+                            ),
+                            label = "diamond_rotation"
+                        )
+                        animRot
+                    } else 0f
 
                     Icon(
                         painter = painterResource(id = R.drawable.ic_logo_diamonds),
@@ -182,18 +186,27 @@ fun AboutScreen() {
                     )
                     Icon(
                         painter = painterResource(id = R.drawable.ic_logo_note),
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.app_name),
                         tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(200.dp)
+                        modifier = Modifier.size(164.dp)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
+                )
 
                 // Version
                 Text(
                     text = "${stringResource(R.string.version)} ${BuildConfig.VERSION_NAME}",
                     fontWeight = FontWeight.Bold,
-                    color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge
+                    color = if (hasBlurBackground) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium
                 )
                 Text(
                     text = "${stringResource(R.string.license)}: GPLv3",
@@ -202,7 +215,7 @@ fun AboutScreen() {
                     color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Buttons
                 val uriHandler = LocalUriHandler.current
@@ -213,7 +226,7 @@ fun AboutScreen() {
                 ) {
                     Button(
                         onClick = { 
-                            runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune/tree/main") }
+                            runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune") }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -298,7 +311,59 @@ fun AboutScreen() {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Fork Attribution Card (Flow -> Fork of https://github.com/MrDemonc/Lune)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (hasBlurBackground) {
+                        if (isDarkTheme) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.22f)
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.fork_attribution_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = stringResource(R.string.fork_attribution_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FilledTonalButton(
+                            onClick = {
+                                runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune") }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.bounceClick()
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_github),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.fork_open_original_repo),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Developer Info
                 Column(modifier = Modifier.fillMaxWidth()) {

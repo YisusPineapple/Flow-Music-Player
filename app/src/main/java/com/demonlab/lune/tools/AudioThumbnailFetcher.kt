@@ -1,13 +1,12 @@
 package com.demonlab.lune.tools
 
-import android.content.ContentUris
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import androidx.annotation.RequiresApi
 import androidx.core.graphics.drawable.toDrawable
 import coil.ImageLoader
 import coil.decode.DataSource
@@ -16,6 +15,8 @@ import coil.fetch.FetchResult
 import coil.fetch.Fetcher
 import coil.request.Options
 import coil.size.pxOrElse
+import com.demonlab.lune.core.format.AudioFormatRegistry
+import java.io.File
 
 class AudioThumbnailFetcher(
     private val uri: Uri,
@@ -24,12 +25,13 @@ class AudioThumbnailFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
-        // 1. Try modern ContentResolver.loadThumbnail (fast, system-cached, per-song correct)
+        val targetWidth = options.size.width.pxOrElse { 384 }.coerceIn(64, 512)
+        val targetHeight = options.size.height.pxOrElse { 384 }.coerceIn(64, 512)
+
+        // 1. Try modern ContentResolver.loadThumbnail (fast, system-cached, pre-downsampled)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
             val thumbnail = runCatching {
-                val width = options.size.width.pxOrElse { 512 }
-                val height = options.size.height.pxOrElse { 512 }
-                context.contentResolver.loadThumbnail(uri, android.util.Size(width, height), null)
+                context.contentResolver.loadThumbnail(uri, android.util.Size(targetWidth, targetHeight), null)
             }.getOrNull()
 
             if (thumbnail != null) {
@@ -41,12 +43,12 @@ class AudioThumbnailFetcher(
             }
         }
 
-        // 2. Fallback to embedded picture via MediaMetadataRetriever (works for content:// and file://)
+        // 2. Fallback to embedded picture via MediaMetadataRetriever with strict bounds subsampling
         val retriever = MediaMetadataRetriever()
         try {
             if (uri.scheme == "file") {
                 val path = uri.path
-                if (path != null && java.io.File(path).exists()) {
+                if (path != null && File(path).exists()) {
                     retriever.setDataSource(path)
                 } else {
                     retriever.setDataSource(context, uri)
@@ -55,22 +57,22 @@ class AudioThumbnailFetcher(
                 retriever.setDataSource(context, uri)
             }
             retriever.embeddedPicture?.let { picture ->
-                val bitmap = BitmapFactory.decodeByteArray(picture, 0, picture.size)
+                val (bitmap, sampled) = decodeSampledBitmap(picture, targetWidth, targetHeight)
                 if (bitmap != null) {
                     return DrawableResult(
                         drawable = bitmap.toDrawable(context.resources),
-                        isSampled = false,
+                        isSampled = sampled,
                         dataSource = DataSource.DISK
                     )
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // ignore
         } finally {
             runCatching { retriever.release() }
         }
 
-        // 3. Fallback to Jaudiotagger (works for WAV with ID3 chunks, DSF, FLAC, etc. where MediaMetadataRetriever fails)
+        // 3. Fallback to Jaudiotagger (works for WAV with ID3 chunks, AIFF, DSF, DFF, FLAC, APE, WV)
         try {
             var filePath: String? = if (uri.scheme == "file") uri.path else null
             if (filePath == null && uri.scheme == "content") {
@@ -82,18 +84,16 @@ class AudioThumbnailFetcher(
                 }
             }
             if (!filePath.isNullOrBlank()) {
-                val file = java.io.File(filePath)
+                val file = File(filePath)
                 if (file.exists() && file.canRead()) {
                     val audioFile = org.jaudiotagger.audio.AudioFileIO.read(file)
                     val artwork = audioFile.tag?.firstArtwork?.binaryData
                     if (artwork != null && artwork.isNotEmpty()) {
-                        val bitmap = runCatching {
-                            BitmapFactory.decodeByteArray(artwork, 0, artwork.size)
-                        }.getOrNull()
+                        val (bitmap, sampled) = decodeSampledBitmap(artwork, targetWidth, targetHeight)
                         if (bitmap != null) {
                             return DrawableResult(
                                 drawable = bitmap.toDrawable(context.resources),
-                                isSampled = false,
+                                isSampled = sampled,
                                 dataSource = DataSource.DISK
                             )
                         }
@@ -104,8 +104,38 @@ class AudioThumbnailFetcher(
             // ignore
         }
 
-        // Fallback returns null if no embedded thumbnail or picture exists
         return null
+    }
+
+    private fun decodeSampledBitmap(
+        bytes: ByteArray,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Pair<Bitmap?, Boolean> {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null to false
+
+            var inSampleSize = 1
+            while ((bounds.outWidth / (inSampleSize * 2)) >= reqWidth &&
+                (bounds.outHeight / (inSampleSize * 2)) >= reqHeight
+            ) {
+                inSampleSize *= 2
+            }
+
+            val decodeOpts = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize
+                inPreferredConfig = if (options.allowRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
+            }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts)
+            decoded to (inSampleSize > 1)
+        } catch (_: OutOfMemoryError) {
+            System.gc()
+            null to false
+        } catch (_: Exception) {
+            null to false
+        }
     }
 
     class Factory(private val context: Context) : Fetcher.Factory<Uri> {
@@ -113,15 +143,13 @@ class AudioThumbnailFetcher(
             val scheme = data.scheme
             if (scheme == "content" || scheme == "file") {
                 val str = data.toString().lowercase()
+                val ext = str.substringAfterLast('.', "").substringBefore('?')
                 val isAudio = str.contains("audio") ||
-                        str.endsWith(".mp3") ||
-                        str.endsWith(".flac") ||
-                        str.endsWith(".wav") ||
-                        str.endsWith(".ogg") ||
-                        str.endsWith(".m4a") ||
-                        str.endsWith(".opus") ||
-                        str.endsWith(".aac") ||
-                        runCatching { context.contentResolver.getType(data)?.startsWith("audio/") == true }.getOrDefault(false)
+                    AudioFormatRegistry.isSupportedAudioExtension(ext) ||
+                    runCatching {
+                        val mime = context.contentResolver.getType(data)
+                        mime?.startsWith("audio/") == true || mime == "video/x-matroska" || mime == "application/ogg"
+                    }.getOrDefault(false)
                 if (isAudio) {
                     return AudioThumbnailFetcher(data, options, context)
                 }

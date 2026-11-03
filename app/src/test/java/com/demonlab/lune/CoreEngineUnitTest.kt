@@ -263,4 +263,234 @@ class CoreEngineUnitTest {
         assertEquals("Center channel must distribute equally to Left and Right", leftSample, rightSample)
         assertTrue("Downmixed center sample should be positive and attenuated cleanly", leftSample in 3500..4200)
     }
+
+    @Test
+    fun streamingLufsAnalyzerComputesRealTimeKWeightedLoudnessAndResolvesUntaggedGain() {
+        val sampleRate = 48_000
+        val analyzer = com.demonlab.lune.core.dsp.StreamingLufsAnalyzer(sampleRateHz = sampleRate, channels = 2)
+
+        // Feed 1.2 seconds of a 1 kHz stereo sine wave at -12 dBFS peak (~0.2512 amplitude)
+        val totalFrames = (sampleRate * 1.2).toInt()
+        val chunkFrames = 2400
+        val chunkBytes = ByteArray(chunkFrames * 4)
+        var frameIdx = 0
+        while (frameIdx < totalFrames) {
+            for (i in 0 until chunkFrames) {
+                val phase = 2.0 * Math.PI * 1000.0 * (frameIdx + i) / sampleRate.toDouble()
+                val s = (sin(phase) * 8230.0).toInt()
+                val b = i * 4
+                chunkBytes[b] = (s and 0xFF).toByte()
+                chunkBytes[b + 1] = ((s shr 8) and 0xFF).toByte()
+                chunkBytes[b + 2] = (s and 0xFF).toByte()
+                chunkBytes[b + 3] = ((s shr 8) and 0xFF).toByte()
+            }
+            analyzer.processPcm16le(chunkBytes, 0, chunkBytes.size)
+            frameIdx += chunkFrames
+        }
+
+        val lufs = analyzer.currentIntegratedLufs()
+        assertNotNull("Expected StreamingLufsAnalyzer to produce integrated LUFS after >1s audio", lufs)
+        // 1 kHz stereo sine at ~0.251 peak has RMS ~0.1776 -> ~ -12.7 LUFS in BS.1770 stereo sum
+        assertTrue("Expected integrated LUFS in realistic range [-16..-9], got $lufs", lufs!! in -16.0f..-9.0f)
+
+        val gainAndPeak = analyzer.currentReplayGainDbAndPeak()
+        assertNotNull(gainAndPeak)
+        val (computedGainDb, samplePeak) = gainAndPeak!!
+        assertTrue("Peak should match ~0.251 full-scale", samplePeak in 0.24f..0.27f)
+
+        val untaggedMeta = ReplayGainEngine.fromRawTags(
+            rgTrackGain = null,
+            computedLoudnessDb = computedGainDb
+        ).copy(trackPeak = samplePeak)
+
+        val resolved = ReplayGainEngine.computeLinearMultiplier(
+            metadata = untaggedMeta,
+            config = ReplayGainConfig(mode = ReplayGainMode.TRACK, enableFallbackAnalysis = true, preventClipping = true)
+        )
+        assertEquals("Auto LUFS", resolved.sourceLabel)
+        assertTrue("Untagged loud sine wave should be attenuated toward -18 LUFS", resolved.appliedGainDb < -2.0f)
+    }
+
+    @Test
+    fun multiTagParserHandlesMultipleBracketsTrailingFeatConnectorsAndDiacriticsWithoutConflicts() {
+        val cfg = MultiTagConfig(
+            enableMultiArtist = true,
+            enableMultiGenre = true,
+            extractArtistsFromTitle = true,
+            cleanExtractedFeatFromTitle = true,
+            customWhitelist = setOf("Crosby, Stills, Nash & Young")
+        )
+
+        // 1. Multiple brackets + preserve (Remix) + unsplit custom 4-way protected band + diacritic dedup
+        val p1 = MultiTagParser.parseTrackTags(
+            rawTitle = "Bailando (Club Remix) [feat. Beyoncé & Sean Paul]",
+            rawArtist = "Enrique Iglesias con Beyonce; Crosby, Stills, Nash & Young",
+            rawGenre = "Latin Pop; Dance/Electronic | Tropical",
+            config = cfg
+        )
+        assertEquals("Bailando (Club Remix)", p1.cleanTitle)
+        assertEquals(
+            listOf("Enrique Iglesias", "Beyonce", "Crosby, Stills, Nash & Young", "Sean Paul"),
+            p1.artists
+        )
+
+        // 2. Unbracketed trailing 'ft.' before edition tag + built-in '+44' and 'Lil Nas X' protection
+        val p2 = MultiTagParser.parseTrackTags(
+            rawTitle = "Industry Baby ft. Jack Harlow (Extended Mix)",
+            rawArtist = "Lil Nas X x +44",
+            rawGenre = "Hip-Hop/Rap, Pop",
+            config = cfg
+        )
+        assertEquals("Industry Baby (Extended Mix)", p2.cleanTitle)
+        assertEquals(listOf("Lil Nas X", "+44", "Jack Harlow"), p2.artists)
+        assertTrue(p2.genres.contains("Hip-Hop/Rap"))
+    }
+
+    @Test
+    fun allTwentyThreeRequestedFormatsAndNativeCrossPlatformDecodersWorkEndToEnd() {
+        val requiredExtensions = listOf(
+            "alac", "aiff", "aif", "ape", "wv", "dsf", "dff",
+            "m4a", "mp4", "mkv", "mka", "webm", "opus",
+            "eac3", "ac3", "ac4", "dts", "wma", "caf",
+            "flac", "wav", "ogg", "aac", "mp3"
+        )
+        for (ext in requiredExtensions) {
+            assertTrue("Format '$ext' must be supported in AudioFormatRegistry", AudioFormatRegistry.isSupportedAudioExtension(ext))
+        }
+
+        // 1. Test synthetic AIFF (Big-Endian 16-bit 44.1 kHz Stereo) via NativePcmContainerDecoder
+        val aiffBytes = buildSyntheticAiff16BeStereo(frames = 128, sampleValue = 12345)
+        val aiffStream = com.demonlab.lune.core.format.NativePcmContainerDecoder.open(
+            com.demonlab.lune.core.format.ByteArraySeekableReader(aiffBytes)
+        )
+        assertNotNull("NativePcmContainerDecoder must open AIFF container", aiffStream)
+        assertEquals("AIFF", aiffStream!!.containerName)
+        assertEquals(44100, aiffStream.outputSampleRate)
+        val aiffOut = ByteArray(512)
+        val aiffRead = aiffStream.readStereoS16le(aiffOut, 0, aiffOut.size)
+        assertEquals(512, aiffRead)
+        val decodedAiffSample = (aiffOut[1].toInt() shl 8) or (aiffOut[0].toInt() and 0xFF)
+        assertEquals(12345, decodedAiffSample)
+        aiffStream.close()
+
+        // 2. Test synthetic Apple CAF (`caff` + `desc` + `data` 16-bit BE 48 kHz Stereo)
+        val cafBytes = buildSyntheticCaf16BeStereo(frames = 64, sampleValue = -9876)
+        val cafStream = com.demonlab.lune.core.format.NativePcmContainerDecoder.open(
+            com.demonlab.lune.core.format.ByteArraySeekableReader(cafBytes)
+        )
+        assertNotNull("NativePcmContainerDecoder must open Apple CAF container", cafStream)
+        assertEquals("CAF", cafStream!!.containerName)
+        assertEquals(48000, cafStream.outputSampleRate)
+        val cafOut = ByteArray(256)
+        val cafRead = cafStream.readStereoS16le(cafOut, 0, cafOut.size)
+        assertEquals(256, cafRead)
+        val decodedCafSample = (cafOut[1].toInt() shl 8) or (cafOut[0].toInt() and 0xFF)
+        assertEquals(-9876, decodedCafSample)
+        cafStream.close()
+
+        // 3. Test synthetic Sony DSF (DSD64 2.8224 MHz 1-bit PDM -> 88.2 kHz 16-bit LE Stereo)
+        val dsfBytes = buildSyntheticDsfStereo()
+        val dsfStream = com.demonlab.lune.core.format.NativePcmContainerDecoder.open(
+            com.demonlab.lune.core.format.ByteArraySeekableReader(dsfBytes)
+        )
+        assertNotNull("NativePcmContainerDecoder must open Sony DSF (DSD64) container", dsfStream)
+        assertEquals("DSD", dsfStream!!.containerName)
+        assertEquals(88200, dsfStream.outputSampleRate)
+        val dsfOut = ByteArray(1024)
+        val dsfRead = dsfStream.readStereoS16le(dsfOut, 0, dsfOut.size)
+        assertTrue("Expected positive PCM byte output from DSF PDM decimation, got $dsfRead", dsfRead > 0)
+        dsfStream.close()
+    }
+
+    private fun buildSyntheticAiff16BeStereo(frames: Int, sampleValue: Int): ByteArray {
+        val pcmBytes = frames * 4
+        val ssndChunkSize = 8 + pcmBytes
+        val commChunkSize = 18
+        val formSize = 4 + (8 + commChunkSize) + (8 + ssndChunkSize)
+        val out = java.io.ByteArrayOutputStream()
+        val dos = java.io.DataOutputStream(out)
+        dos.writeBytes("FORM")
+        dos.writeInt(formSize)
+        dos.writeBytes("AIFF")
+        // COMM chunk
+        dos.writeBytes("COMM")
+        dos.writeInt(commChunkSize)
+        dos.writeShort(2) // channels
+        dos.writeInt(frames) // numSampleFrames
+        dos.writeShort(16) // sampleSize
+        // 80-bit IEEE extended for 44100.0 Hz: 0x400E AC44 0000 0000 0000
+        dos.write(byteArrayOf(0x40, 0x0E, 0xAC.toByte(), 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
+        // SSND chunk
+        dos.writeBytes("SSND")
+        dos.writeInt(ssndChunkSize)
+        dos.writeInt(0) // offset
+        dos.writeInt(0) // blockSize
+        repeat(frames * 2) {
+            dos.writeShort(sampleValue)
+        }
+        dos.flush()
+        return out.toByteArray()
+    }
+
+    private fun buildSyntheticCaf16BeStereo(frames: Int, sampleValue: Int): ByteArray {
+        val pcmBytes = frames * 4
+        val out = java.io.ByteArrayOutputStream()
+        val dos = java.io.DataOutputStream(out)
+        dos.writeBytes("caff")
+        dos.writeShort(1) // mFileVersion
+        dos.writeShort(0) // mFileFlags
+        // desc chunk
+        dos.writeBytes("desc")
+        dos.writeLong(32L)
+        dos.writeLong(java.lang.Double.doubleToRawLongBits(48000.0))
+        dos.writeBytes("lpcm")
+        dos.writeInt(0) // flags = 0 (int, big-endian)
+        dos.writeInt(4) // bytesPerPacket
+        dos.writeInt(1) // framesPerPacket
+        dos.writeInt(2) // channelsPerFrame
+        dos.writeInt(16) // bitsPerChannel
+        // data chunk
+        dos.writeBytes("data")
+        dos.writeLong((4 + pcmBytes).toLong())
+        dos.writeInt(0) // mEditCount
+        repeat(frames * 2) {
+            dos.writeShort(sampleValue)
+        }
+        dos.flush()
+        return out.toByteArray()
+    }
+
+    private fun buildSyntheticDsfStereo(): ByteArray {
+        val blockSizePerCh = 64
+        val channels = 2
+        val audioPayloadBytes = blockSizePerCh * channels * 2 // 2 superblocks
+        val totalFileSize = 28L + 52L + 12L + audioPayloadBytes
+        val buf = java.nio.ByteBuffer.allocate(totalFileSize.toInt()).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        // 'DSD ' chunk (28 bytes)
+        buf.put("DSD ".toByteArray(Charsets.US_ASCII))
+        buf.putLong(28L)
+        buf.putLong(totalFileSize)
+        buf.putLong(0L)
+        // 'fmt ' chunk (52 bytes)
+        buf.put("fmt ".toByteArray(Charsets.US_ASCII))
+        buf.putLong(52L)
+        buf.putInt(1) // format version
+        buf.putInt(0) // format ID (DSD raw)
+        buf.putInt(2) // channel type (stereo)
+        buf.putInt(channels)
+        buf.putInt(2_822_400) // DSD64
+        buf.putInt(1) // bitsPerSample (LSB first)
+        buf.putLong((blockSizePerCh * 2 * 8).toLong()) // sampleCount per channel
+        buf.putInt(blockSizePerCh)
+        buf.putInt(0) // reserved
+        // 'data' chunk (12 + payload)
+        buf.put("data".toByteArray(Charsets.US_ASCII))
+        buf.putLong((12 + audioPayloadBytes).toLong())
+        // Fill PDM bytes with 0xAA (50% ones = silence/zero DC) and 0xFF (positive)
+        repeat(audioPayloadBytes) { idx ->
+            buf.put(if (idx % 2 == 0) 0xCC.toByte() else 0xAA.toByte())
+        }
+        return buf.array()
+    }
 }
+

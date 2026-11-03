@@ -2,7 +2,10 @@ package com.demonlab.lune.desktop
 
 import com.demonlab.lune.core.dsp.CrossfadeCurveEngine
 import com.demonlab.lune.core.dsp.ReplayGainEngine
+import com.demonlab.lune.core.dsp.StreamingLufsAnalyzer
 import com.demonlab.lune.core.format.AudioFormatRegistry
+import com.demonlab.lune.core.format.NativePcmContainerDecoder
+import com.demonlab.lune.core.format.SeekableByteReader
 import com.demonlab.lune.core.metadata.MultiTagParser
 import com.demonlab.lune.core.model.CoreTrack
 import com.demonlab.lune.core.model.CrossfadeCurveMode
@@ -31,19 +34,22 @@ import org.jaudiotagger.tag.FieldKey
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
+import java.io.RandomAccessFile
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.FloatControl
 import javax.sound.sampled.Mixer
 import javax.sound.sampled.SourceDataLine
+import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.pow
 
 /**
- * Persistent Desktop preferences stored in ~/.config/lune/desktop_settings.json
- * (or %APPDATA%/Lune on Windows).
+ * Persistent Desktop preferences stored in ~/.config/flow/desktop_settings.json
+ * (or %APPDATA%/Flow on Windows), with automatic seamless migration from legacy Lune config.
  */
 data class DesktopSettings(
     val lastMusicFolder: String = File(System.getProperty("user.home"), "Music").absolutePath,
@@ -104,16 +110,15 @@ private interface PcmFrameSource : AutoCloseable {
 }
 
 /**
- * Ultra-lightweight Desktop Audio, Extended-Format & Gapless Engine for Windows and Linux.
+ * Flow Ultra-Lightweight Desktop Audio, Real-Time K-Weighted LUFS, Extended-Format & Gapless Engine
+ * for Windows and Linux.
  *
- * Optimizations for modest / legacy hardware (e.g. Pentium E5800 SSE2, 1-core CPUs, mechanical HDDs,
- * NVIDIA GT 610, PipeWire/ALSA, Generalplus USB Audio DAC):
- * - Incremental disk metadata cache (~/.config/lune/desktop_library_cache.json) skips unchanged files on HDDs.
- * - SSE2-safe `ffmpeg` s16le pipe decoder supports ALAC, AIFF, MKV, MKA, MP4, WEBM, Opus 5.1/7.1,
- *   EAC3, AC3, AC4, APE, WavPack, DSD, WMA, FLAC, MP3, OGG, WAV with zero JVM heap bloat.
- * - Automatic pure-JVM `AudioSystem` fallback + fixed-point Q10 ITU-R BS.775 stereo downmixer.
- * - True sample-accurate Gapless playback: keeps a single `SourceDataLine` open across consecutive tracks.
- * - In-place Q12 fixed-point ReplayGain + Anti-Clipping Peak Limiter.
+ * Compatible with all 23+ formats & containers:
+ * ALAC, AIFF/AIF, APE, WavPack (WV), DSD (DSF/DFF), M4A, MP4, MKV/MKA, WebM,
+ * Opus (stereo & multichannel 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, CAF,
+ * FLAC, WAV, OGG, AAC, MP3, AU/SND.
+ *
+ * Designed for <180 MB total RSS on modest dual-core / single-core SSE2 PCs (e.g. Pentium E5800 + GT 610).
  */
 class DesktopAudioEngine(private val scope: CoroutineScope) {
 
@@ -125,6 +130,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     val isLowSpecHardwareDetected: Boolean = detectModestDesktopHardware()
     val hasFfmpegAvailable: Boolean by lazy { detectFfmpegBinary() != null }
     private val ffmpegBinaryPath: String? by lazy { detectFfmpegBinary() }
+    private val ffprobeBinaryPath: String? by lazy { detectFfprobeBinary() }
 
     private val _currentSong = MutableStateFlow<DesktopSong?>(null)
     val currentSong: StateFlow<DesktopSong?> = _currentSong.asStateFlow()
@@ -141,8 +147,15 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val _scanStatus = MutableStateFlow("")
+    val scanStatus: StateFlow<String> = _scanStatus.asStateFlow()
+
+    // Lightweight in-memory map of real-time computed LUFS gains persisted periodically to disk
+    private val computedLoudnessOverrides = ConcurrentHashMap<String, Pair<Float, Float>>()
+
     private var primaryJob: Job? = null
     private var secondaryJob: Job? = null
+    private var backgroundLufsJob: Job? = null
     @Volatile private var primaryLine: SourceDataLine? = null
     @Volatile private var secondaryLine: SourceDataLine? = null
     @Volatile private var activeFfmpegProcess: Process? = null
@@ -156,7 +169,8 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     @Volatile private var respectAlbumGapless: Boolean = true
     @Volatile private var crossfadeEnabled: Boolean = false
     @Volatile private var crossfadeMs: Long = 0L
-    @Volatile private var lowResourceUiThrottling: Boolean = isLowSpecHardwareDetected
+    @Volatile var isLowResourceActive: Boolean = isLowSpecHardwareDetected
+        private set
 
     // Provider queried by the streaming loop right as a track ends for zero-gap splicing
     @Volatile var nextTrackProvider: ((current: DesktopSong, allowGaplessOnly: Boolean) -> DesktopSong?)? = null
@@ -164,7 +178,9 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     fun loadSettings(): DesktopSettings {
         return try {
             if (settingsFile.exists()) {
-                val parsed = gson.fromJson(settingsFile.readText(), DesktopSettings::class.java)
+                val parsed = settingsFile.bufferedReader(Charsets.UTF_8).use {
+                    gson.fromJson(it, DesktopSettings::class.java)
+                }
                 if (parsed != null) {
                     applyEngineSettings(parsed)
                     return parsed
@@ -183,7 +199,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         scope.launch(Dispatchers.IO) {
             try {
                 if (!configDir.exists()) configDir.mkdirs()
-                settingsFile.writeText(gson.toJson(settings))
+                settingsFile.bufferedWriter(Charsets.UTF_8).use { gson.toJson(settings, it) }
             } catch (_: Exception) {
             }
         }
@@ -197,19 +213,27 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         respectAlbumGapless = settings.respectAlbumGapless
         crossfadeEnabled = settings.crossfadeEnabled
         crossfadeMs = if (settings.crossfadeEnabled) (settings.crossfadeSeconds * 1000f).toLong() else 0L
-        lowResourceUiThrottling = when (settings.performanceProfile) {
+        isLowResourceActive = when (settings.performanceProfile) {
             PerformanceProfile.AUTO -> isLowSpecHardwareDetected
             PerformanceProfile.ULTRA_SAVER, PerformanceProfile.LIGHT -> true
             PerformanceProfile.FULL -> false
         }
         applyLineGain(primaryLine, masterVolume)
         _currentSong.value?.let { current ->
+            val effectiveMeta = mergeWithComputedOverride(current)
             _activeReplayGain.value = ReplayGainEngine.computeLinearMultiplier(
-                metadata = current.core.replayGain,
+                metadata = effectiveMeta,
                 config = replayGainConfig,
                 isAlbumSequentialContext = true
             )
         }
+    }
+
+    private fun mergeWithComputedOverride(song: DesktopSong): ReplayGainMetadata {
+        val base = song.core.replayGain
+        if (base.hasEmbeddedTags) return base
+        val ov = computedLoudnessOverrides[song.file.absolutePath] ?: return base
+        return base.copy(computedLoudnessDb = ov.first, trackPeak = ov.second)
     }
 
     fun listAudioOutputDevices(): List<AudioOutputDevice> {
@@ -242,6 +266,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     ): List<DesktopSong> = withContext(Dispatchers.IO) {
         if (!folder.exists() || !folder.isDirectory) return@withContext emptyList()
         _isScanning.value = true
+        _scanStatus.value = "Iniciando escaneo incremental..."
         try {
             val cachedMap: MutableMap<String, CachedTrackEntry> = if (forceRescan) {
                 HashMap()
@@ -249,11 +274,14 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 loadTrackCache()
             }
             var cacheDirty = false
+            var reused = 0
+            var parsedNew = 0
             val results = ArrayList<DesktopSong>(512)
 
             folder.walkTopDown()
                 .maxDepth(10)
-                .filter { it.isFile && AudioFormatRegistry.isSupportedAudioExtension(it.extension) }
+                .onEnter { dir -> !dir.name.startsWith(".") }
+                .filter { it.isFile && it.length() > 4096L && AudioFormatRegistry.isSupportedAudioExtension(it.extension) }
                 .forEach { file ->
                     val absPath = file.absolutePath
                     val lastMod = file.lastModified()
@@ -261,29 +289,132 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                     val cached = cachedMap[absPath]
 
                     val entry = if (cached != null && cached.lastModified == lastMod && cached.fileSize == length) {
+                        reused++
                         cached
                     } else {
-                        val parsed = parseAudioFileToCacheEntry(file)
+                        parsedNew++
+                        val parsed = parseAudioFileToCacheEntry(file, cached?.computedLoudnessDb)
                         cachedMap[absPath] = parsed
                         cacheDirty = true
                         parsed
                     }
+                    entry.computedLoudnessDb?.let { comp ->
+                        computedLoudnessOverrides[absPath] = comp to (entry.rgTrackPeak ?: 0.98f)
+                    }
                     results.add(buildDesktopSong(entry, file, multiTagConfig))
+                    if (results.size % 50 == 0) {
+                        _scanStatus.value = "Escaneadas ${results.size} pistas ($reused en caché, $parsedNew nuevas)..."
+                    }
                 }
 
             if (cacheDirty) {
                 saveTrackCache(cachedMap)
             }
 
-            results.sortedWith(
+            val sorted = results.sortedWith(
                 compareBy(
                     { it.core.album.lowercase(Locale.ROOT) },
                     { if (it.core.trackNumber > 0) it.core.trackNumber else Int.MAX_VALUE },
                     { it.core.title.lowercase(Locale.ROOT) }
                 )
             )
+            _scanStatus.value = "Biblioteca lista: ${sorted.size} pistas ($reused instantáneas desde caché)"
+            sorted
         } finally {
             _isScanning.value = false
+        }
+    }
+
+    /**
+     * Low-priority background ITU-R BS.1770 K-weighted LUFS analyzer for untagged Desktop tracks.
+     */
+    fun analyzeUntaggedTracksInBackground(songs: List<DesktopSong>) {
+        if (backgroundLufsJob?.isActive == true) return
+        val candidates = songs.filter {
+            !it.core.replayGain.hasEmbeddedTags &&
+                it.core.replayGain.computedLoudnessDb == null &&
+                !computedLoudnessOverrides.containsKey(it.file.absolutePath)
+        }
+        if (candidates.isEmpty()) {
+            _scanStatus.value = "Todas las pistas ya cuentan con ganancia ReplayGain / LUFS."
+            return
+        }
+
+        backgroundLufsJob = scope.launch(Dispatchers.IO) {
+            val cachedMap = loadTrackCache()
+            var dirtyCount = 0
+            val readBuf = ByteArray(16384)
+            val stereoBuf = ByteArray(16384)
+
+            candidates.forEachIndexed { idx, song ->
+                if (!isActive) return@launch
+                // Pause background analysis while crossfading on modest 2-core CPUs
+                if (isLowResourceActive && _isPlaying.value) {
+                    delay(120L)
+                }
+                _scanStatus.value = "Analizando LUFS (${idx + 1}/${candidates.size}): ${song.core.displayTitle}"
+
+                val startOffset = if (song.core.durationMs > 25_000L) (song.core.durationMs * 0.25).toLong() else 0L
+                val source = openDecodedPcmSource(song, startOffset, isSecondary = true)
+                if (source != null) {
+                    try {
+                        val analyzer = StreamingLufsAnalyzer(
+                            sampleRateHz = source.sampleRate.toInt().coerceIn(8000, 192000),
+                            channels = 2
+                        )
+                        val maxStereoBytes = (source.sampleRate.toInt() * 4 * 8).coerceAtLeast(65536)
+                        var processedBytes = 0
+                        while (processedBytes < maxStereoBytes && isActive) {
+                            val n = source.read(readBuf, 0, readBuf.size)
+                            if (n <= 0) break
+                            val stValid = if (source.channels == 2) {
+                                readBuf.copyInto(stereoBuf, 0, 0, n)
+                                n
+                            } else {
+                                AudioFormatRegistry.downmixPcm16leToStereo(readBuf, n, source.channels, stereoBuf)
+                            }
+                            analyzer.processPcm16le(stereoBuf, stValid)
+                            processedBytes += stValid
+                        }
+                        val measured = analyzer.computeCurrentGainAndPeak()
+                        if (measured != null) {
+                            persistComputedLoudness(cachedMap, song.file.absolutePath, measured.first, measured.second, saveNow = false)
+                            dirtyCount++
+                            if (dirtyCount % 12 == 0) {
+                                saveTrackCache(cachedMap)
+                            }
+                        }
+                    } finally {
+                        runCatching { source.close() }
+                    }
+                }
+                delay(if (isLowResourceActive) 90L else 20L)
+            }
+            if (dirtyCount > 0) {
+                saveTrackCache(cachedMap)
+            }
+            _scanStatus.value = "Análisis LUFS completado ($dirtyCount pistas normalizadas)"
+        }
+    }
+
+    private fun persistComputedLoudness(
+        cacheMap: MutableMap<String, CachedTrackEntry>?,
+        absPath: String,
+        gainDb: Float,
+        peak: Float,
+        saveNow: Boolean
+    ) {
+        computedLoudnessOverrides[absPath] = gainDb to peak
+        val targetMap = cacheMap ?: loadTrackCache()
+        val existing = targetMap[absPath]
+        if (existing != null) {
+            targetMap[absPath] = existing.copy(
+                computedLoudnessDb = gainDb,
+                rgTrackPeak = existing.rgTrackPeak ?: peak
+            )
+            if (saveNow) {
+                scope.launch(Dispatchers.IO) { saveTrackCache(targetMap) }
+            }
         }
     }
 
@@ -349,21 +480,50 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         )
     }
 
-    private fun parseAudioFileToCacheEntry(file: File): CachedTrackEntry {
+    private fun parseAudioFileToCacheEntry(file: File, existingComputedDb: Float? = null): CachedTrackEntry {
         val ext = file.extension.lowercase(Locale.ROOT)
-        try {
+        var title = file.nameWithoutExtension
+        var artist = "Unknown Artist"
+        var album = file.parentFile?.name.orEmpty()
+        var genre: String? = null
+        var trackNo = 0
+        var year = 0
+        var durationMs = 0L
+        var sampleRate: Int? = null
+        var bitDepth: Int? = null
+        var bitrate: Int? = null
+        var channels = 2
+        var codecHint: String? = null
+        var rgMeta = ReplayGainMetadata()
+
+        // 1. Jaudiotagger tag & audioHeader inspection (MP3, FLAC, OGG, OPUS, M4A, MP4, WAV, AIFF, DSF, WMA)
+        runCatching {
             val af = AudioFileIO.read(file)
             val tag = af.tag
             val header = af.audioHeader
-            val title = tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
-            val artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() } ?: "Unknown Artist"
-            val album = tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() } ?: file.parentFile?.name.orEmpty()
-            val genre = tag?.getFirst(FieldKey.GENRE)?.takeIf { it.isNotBlank() }
-            val trackNo = tag?.getFirst(FieldKey.TRACK)?.substringBefore("/")?.trim()?.toIntOrNull() ?: 0
-            val year = tag?.getFirst(FieldKey.YEAR)?.take(4)?.toIntOrNull() ?: 0
-            val channels = parseChannelCount(header?.channels)
+            codecHint = header?.format
+            val allArtists = runCatching {
+                tag?.getAll(FieldKey.ARTIST)?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct().orEmpty()
+            }.getOrDefault(emptyList())
+            val joinedArtist = if (allArtists.size > 1) allArtists.joinToString("; ") else allArtists.firstOrNull()
+            val allGenres = runCatching {
+                tag?.getAll(FieldKey.GENRE)?.map { it.trim() }?.filter { it.isNotEmpty() }?.distinct().orEmpty()
+            }.getOrDefault(emptyList())
+            val joinedGenre = if (allGenres.size > 1) allGenres.joinToString("; ") else allGenres.firstOrNull()
 
-            val rgMeta = ReplayGainEngine.fromRawTags(
+            tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() }?.let { title = it }
+            joinedArtist?.takeIf { it.isNotBlank() }?.let { artist = it }
+            tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() }?.let { album = it }
+            joinedGenre?.takeIf { it.isNotBlank() }?.let { genre = it }
+            trackNo = tag?.getFirst(FieldKey.TRACK)?.substringBefore("/")?.trim()?.toIntOrNull() ?: 0
+            year = tag?.getFirst(FieldKey.YEAR)?.take(4)?.toIntOrNull() ?: 0
+            durationMs = (header?.trackLength ?: 0) * 1000L
+            sampleRate = header?.sampleRateAsNumber?.takeIf { it > 0 }
+            bitDepth = header?.bitsPerSample?.takeIf { it > 0 }
+            bitrate = header?.bitRateAsNumber?.let { (it * 1000).toInt() }
+            channels = parseChannelCount(header?.channels)
+
+            rgMeta = ReplayGainEngine.fromRawTags(
                 rgTrackGain = readCustomTag(tag, "REPLAYGAIN_TRACK_GAIN", "replaygain_track_gain"),
                 rgTrackPeak = readCustomTag(tag, "REPLAYGAIN_TRACK_PEAK", "replaygain_track_peak"),
                 rgAlbumGain = readCustomTag(tag, "REPLAYGAIN_ALBUM_GAIN", "replaygain_album_gain"),
@@ -372,53 +532,87 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 r128AlbumGain = readCustomTag(tag, "R128_ALBUM_GAIN", "r128_album_gain"),
                 iTunNorm = readCustomTag(tag, "iTunNORM", "ITUNNORM")
             )
+        }
 
-            val formatBadge = AudioFormatRegistry.formatBadgeLabel(ext, header?.format, channels)
-            return CachedTrackEntry(
-                path = file.absolutePath,
-                lastModified = file.lastModified(),
-                fileSize = file.length(),
-                title = title,
-                artist = artist,
-                album = album,
-                genre = genre,
-                durationMs = (header?.trackLength ?: 0) * 1000L,
-                year = year,
-                trackNumber = trackNo,
-                sampleRate = header?.sampleRateAsNumber,
-                bitDepth = header?.bitsPerSample?.takeIf { it > 0 },
-                bitrate = header?.bitRateAsNumber?.let { (it * 1000).toInt() },
-                channels = channels,
-                formatCode = formatBadge,
-                rgTrackGainDb = rgMeta.trackGainDb,
-                rgTrackPeak = rgMeta.trackPeak,
-                rgAlbumGainDb = rgMeta.albumGainDb,
-                rgAlbumPeak = rgMeta.albumPeak,
-                computedLoudnessDb = null
-            )
+        // 2. Native pure-Kotlin header inspection for AIFF/AIFC, CAF, DSF, DFF, AU
+        if ((durationMs <= 0L || sampleRate == null) && NativePcmContainerDecoder.supportsExtension(ext)) {
+            runCatching {
+                val raf = RandomAccessFile(file, "r")
+                val reader = rafToSeekableReader(raf)
+                val stream = NativePcmContainerDecoder.open(reader, ext)
+                if (stream != null) {
+                    if (durationMs <= 0L) durationMs = stream.durationMs
+                    if (sampleRate == null) sampleRate = stream.sampleRate
+                    if (bitDepth == null) bitDepth = stream.originalBitDepth
+                    channels = stream.originalChannels.coerceIn(1, 16)
+                    stream.close()
+                } else {
+                    raf.close()
+                }
+            }
+        }
+
+        // 3. Lightweight ffprobe fallback for containers (MKV, MKA, WebM, EAC3, AC3, AC4, DTS, APE, WV)
+        if (durationMs <= 0L && ffprobeBinaryPath != null) {
+            probeViaFfprobe(file)?.let { (dur, sr, ch) ->
+                if (dur > 0L) durationMs = dur
+                if (sampleRate == null && sr > 0) sampleRate = sr
+                if (ch > 0) channels = ch
+            }
+        }
+
+        val formatBadge = AudioFormatRegistry.formatBadgeLabel(ext, codecHint, channels)
+        return CachedTrackEntry(
+            path = file.absolutePath,
+            lastModified = file.lastModified(),
+            fileSize = file.length(),
+            title = title,
+            artist = artist,
+            album = album,
+            genre = genre,
+            durationMs = durationMs,
+            year = year,
+            trackNumber = trackNo,
+            sampleRate = sampleRate,
+            bitDepth = bitDepth,
+            bitrate = bitrate,
+            channels = channels,
+            formatCode = formatBadge,
+            rgTrackGainDb = rgMeta.trackGainDb,
+            rgTrackPeak = rgMeta.trackPeak,
+            rgAlbumGainDb = rgMeta.albumGainDb,
+            rgAlbumPeak = rgMeta.albumPeak,
+            computedLoudnessDb = existingComputedDb
+        )
+    }
+
+    private fun probeViaFfprobe(file: File): Triple<Long, Int, Int>? {
+        val bin = ffprobeBinaryPath ?: return null
+        return try {
+            val proc = ProcessBuilder(
+                bin, "-v", "error", "-select_streams", "a:0",
+                "-show_entries", "stream=sample_rate,channels:format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=0",
+                file.absolutePath
+            ).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            val out = proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
+            var sr = 0
+            var ch = 2
+            var durMs = 0L
+            for (line in out.lineSequence()) {
+                when {
+                    line.startsWith("sample_rate=") -> sr = line.substringAfter("=").trim().toIntOrNull() ?: 0
+                    line.startsWith("channels=") -> ch = line.substringAfter("=").trim().toIntOrNull()?.coerceIn(1, 16) ?: 2
+                    line.startsWith("duration=") -> {
+                        val sec = line.substringAfter("=").trim().toDoubleOrNull()
+                        if (sec != null && sec > 0.0) durMs = (sec * 1000.0).toLong()
+                    }
+                }
+            }
+            Triple(durMs, sr, ch)
         } catch (_: Exception) {
-            return CachedTrackEntry(
-                path = file.absolutePath,
-                lastModified = file.lastModified(),
-                fileSize = file.length(),
-                title = file.nameWithoutExtension,
-                artist = "Unknown Artist",
-                album = file.parentFile?.name.orEmpty(),
-                genre = null,
-                durationMs = 0L,
-                year = 0,
-                trackNumber = 0,
-                sampleRate = null,
-                bitDepth = null,
-                bitrate = null,
-                channels = 2,
-                formatCode = AudioFormatRegistry.formatBadgeLabel(ext, null, 2),
-                rgTrackGainDb = null,
-                rgTrackPeak = null,
-                rgAlbumGainDb = null,
-                rgAlbumPeak = null,
-                computedLoudnessDb = null
-            )
+            null
         }
     }
 
@@ -462,7 +656,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 tag.setField(FieldKey.GENRE, genre)
             }
             af.commit()
-            val updatedEntry = parseAudioFileToCacheEntry(song.file)
+            val updatedEntry = parseAudioFileToCacheEntry(song.file, song.core.replayGain.computedLoudnessDb)
             buildDesktopSong(updatedEntry, song.file, multiTagConfig)
         } catch (_: Exception) {
             null
@@ -541,7 +735,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         }
 
         scope.launch(Dispatchers.Default) {
-            val stepMs = if (lowResourceUiThrottling) 80L else 40L
+            val stepMs = if (isLowResourceActive) 80L else 40L
             val steps = (durationMs / stepMs).coerceAtLeast(8L).toInt()
             val delayStep = durationMs / steps
             for (step in 1..steps) {
@@ -586,8 +780,8 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     }
 
     /**
-     * Streams [initialSong] and seamlessly splices subsequent tracks onto the SAME [SourceDataLine]
-     * when Gapless playback is active, completely eliminating ALSA / PipeWire / WASAPI close-reopen clicks!
+     * Streams [initialSong] with zero-gap splicing across consecutive tracks on the SAME [SourceDataLine]
+     * and performs real-time ITU-R BS.1770 K-weighted LUFS normalization on untagged tracks.
      */
     private suspend fun streamChainToLine(
         initialSong: DesktopSong,
@@ -611,7 +805,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                     _currentSong.value = track
                 }
 
-                var rgMeta = track.core.replayGain
+                var rgMeta = mergeWithComputedOverride(track)
                 val source = openDecodedPcmSource(track, startMs, isSecondary) ?: break
 
                 try {
@@ -625,7 +819,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                         false
                     )
 
-                    if (activeLine == null || !activeLine.isOpen || kotlin.math.abs(activeRate - source.sampleRate) > 1f) {
+                    if (activeLine == null || !activeLine.isOpen || abs(activeRate - source.sampleRate) > 1f) {
                         activeLine?.drain()
                         activeLine?.close()
                         val newLine = openHardwareLine(targetFormat)
@@ -637,16 +831,23 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                     }
 
                     var rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
-                    var hasProbedFallbackLoudness = rgMeta.hasEmbeddedTags || rgMeta.computedLoudnessDb != null || !replayGainConfig.enableFallbackAnalysis
+                    val needsLiveLufs = !rgMeta.hasEmbeddedTags &&
+                        rgMeta.computedLoudnessDb == null &&
+                        replayGainConfig.enableFallbackAnalysis
+                    val lufsAnalyzer = if (needsLiveLufs) {
+                        StreamingLufsAnalyzer(sampleRateHz = source.sampleRate.toInt().coerceIn(8000, 192000), channels = 2)
+                    } else null
+                    var earlyLocked = false
+                    var refinedLocked = false
 
                     var stereoBytesWritten = ((startMs / 1000.0) * source.sampleRate * 4.0).toLong()
                     val bytesPerMs = ((source.sampleRate * 4f) / 1000f).coerceAtLeast(1f)
                     var lastProgressUpdateMs = 0L
-                    val progressIntervalMs = if (lowResourceUiThrottling) 450L else 120L
+                    val progressIntervalMs = if (isLowResourceActive) 500L else 130L
 
                     while (currentCoroutineContext().isActive) {
                         if (!_isPlaying.value) {
-                            delay(60)
+                            delay(80)
                             continue
                         }
                         val readBytes = source.read(rawReadBuf, 0, rawReadBuf.size)
@@ -665,15 +866,22 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                             )
                         }
 
-                        if (!hasProbedFallbackLoudness && stereoValidBytes >= 2048) {
-                            hasProbedFallbackLoudness = true
-                            val estimated = ReplayGainEngine.estimateGainFromPcm16le(stereoBuf, stereoValidBytes, 2)
-                            if (estimated != null) {
-                                rgMeta = rgMeta.copy(
-                                    computedLoudnessDb = estimated.first,
-                                    trackPeak = estimated.second
-                                )
-                                rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
+                        if (lufsAnalyzer != null && !refinedLocked && stereoValidBytes >= 4) {
+                            lufsAnalyzer.processPcm16le(stereoBuf, stereoValidBytes)
+                            if (!earlyLocked && lufsAnalyzer.completedBlocks >= 4) {
+                                earlyLocked = true
+                                lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                                    rgMeta = rgMeta.copy(computedLoudnessDb = gainDb, trackPeak = peak)
+                                    rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
+                                    persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = false)
+                                }
+                            } else if (earlyLocked && lufsAnalyzer.completedBlocks >= 25) {
+                                refinedLocked = true
+                                lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                                    rgMeta = rgMeta.copy(computedLoudnessDb = gainDb, trackPeak = peak)
+                                    rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
+                                    persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = true)
+                                }
                             }
                         }
 
@@ -691,6 +899,13 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                                 val elapsedMs = stereoBytesWritten / bytesPerMs
                                 _progress.value = (elapsedMs / track.core.durationMs).coerceIn(0f, 1f)
                             }
+                        }
+                    }
+
+                    // If short track ended between 1..24 blocks, still save computed LUFS
+                    if (lufsAnalyzer != null && !refinedLocked && lufsAnalyzer.completedBlocks >= 1) {
+                        lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                            persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = true)
                         }
                     }
                 } finally {
@@ -766,14 +981,23 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         startOffsetMs: Long,
         isSecondary: Boolean
     ): PcmFrameSource? {
-        val ffmpeg = ffmpegBinaryPath
         val ext = song.file.extension.lowercase(Locale.ROOT)
-        val isNativeJavaSoundFormat = ext == "wav" || ext == "wave" || ext == "au" || ext == "aiff" || ext == "aif"
+        val ffmpeg = ffmpegBinaryPath
 
-        if (ffmpeg != null && (!isNativeJavaSoundFormat || startOffsetMs > 0L || song.core.channels > 2)) {
-            openFfmpegPcmSource(ffmpeg, song, startOffsetMs, isSecondary)?.let { return it }
+        // 1. Pure-Kotlin zero-dependency NativePcmContainerDecoder for AIFF/AIFC, CAF, DSF, DFF, AU/SND
+        // Works on all Windows/Linux setups even without FFmpeg installed, with instant random seek!
+        if (NativePcmContainerDecoder.supportsExtension(ext)) {
+            openNativeContainerPcmSource(song.file, ext, startOffsetMs)?.let { return it }
         }
 
+        // 2. SSE2-safe FFmpeg pipe for ALAC, APE, WV, M4A, MP4, MKV/MKA, WebM, Opus 5.1/7.1,
+        // EAC3, AC3, AC4, DTS, WMA, FLAC, OGG, AAC, MP3, etc.
+        val isBasicWav = ext == "wav" || ext == "wave"
+        if (ffmpeg != null && (!isBasicWav || startOffsetMs > 0L || song.core.channels > 2)) {
+            openFfmpegPcmSource(ffmpeg, song, ext, startOffsetMs, isSecondary)?.let { return it }
+        }
+
+        // 3. JavaSound fallback (WAV, standard PCM, or SPI plugins)
         return try {
             val rawStream = AudioSystem.getAudioInputStream(song.file)
             val baseFormat = rawStream.format
@@ -804,21 +1028,76 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 }
             }
         } catch (_: Exception) {
-            if (ffmpeg != null) openFfmpegPcmSource(ffmpeg, song, startOffsetMs, isSecondary) else null
+            if (ffmpeg != null) openFfmpegPcmSource(ffmpeg, song, ext, startOffsetMs, isSecondary) else null
         }
+    }
+
+    private fun openNativeContainerPcmSource(
+        file: File,
+        ext: String,
+        startOffsetMs: Long
+    ): PcmFrameSource? {
+        return try {
+            val raf = RandomAccessFile(file, "r")
+            val reader = rafToSeekableReader(raf)
+            val decoded = NativePcmContainerDecoder.open(reader, ext) ?: run {
+                raf.close()
+                return null
+            }
+            if (startOffsetMs > 0L) {
+                decoded.seekToMs(startOffsetMs)
+            }
+            object : PcmFrameSource {
+                override val sampleRate: Float = decoded.sampleRate.toFloat()
+                override val channels: Int = decoded.channels
+                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                    if (offset == 0) {
+                        val n = decoded.readPcm16le(buffer, length)
+                        return if (n <= 0) -1 else n
+                    }
+                    val temp = ByteArray(length)
+                    val n = decoded.readPcm16le(temp, length)
+                    if (n <= 0) return -1
+                    temp.copyInto(buffer, offset, 0, n)
+                    return n
+                }
+                override fun close() {
+                    runCatching { decoded.close() }
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun rafToSeekableReader(raf: RandomAccessFile): SeekableByteReader = object : SeekableByteReader {
+        override val length: Long get() = raf.length()
+        override fun seek(position: Long) = raf.seek(position)
+        override fun position(): Long = raf.filePointer
+        override fun read(buffer: ByteArray, offset: Int, count: Int): Int = raf.read(buffer, offset, count)
+        override fun close() = raf.close()
     }
 
     private fun openFfmpegPcmSource(
         ffmpegBin: String,
         song: DesktopSong,
+        ext: String,
         startOffsetMs: Long,
         isSecondary: Boolean
     ): PcmFrameSource? {
         return try {
-            val outSampleRate = (song.core.sampleRate ?: 48000).coerceIn(22050, 96000)
-            val cmd = ArrayList<String>(16)
+            val rawSr = song.core.sampleRate ?: 48000
+            // Exact 88.2 kHz integer decimation for 2.8224 MHz DSD (DSF/DFF) or ultra-high rates
+            val outSampleRate = when {
+                ext == "dsf" || ext == "dff" || rawSr > 192_000 -> 88_200
+                isLowResourceActive -> rawSr.coerceIn(22_050, 48_000)
+                else -> rawSr.coerceIn(22_050, 96_000)
+            }
+            val cmd = ArrayList<String>(18)
             cmd.add(ffmpegBin)
             cmd.add("-nostdin")
+            cmd.add("-threads")
+            cmd.add(if (isLowResourceActive) "1" else "2")
             cmd.add("-v")
             cmd.add("quiet")
             if (startOffsetMs > 0L) {
@@ -843,7 +1122,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 .start()
 
             if (isSecondary) secondaryFfmpegProcess = proc else activeFfmpegProcess = proc
-            val stdout = BufferedInputStream(proc.inputStream, 32768)
+            val stdout = BufferedInputStream(proc.inputStream, 16384)
 
             object : PcmFrameSource {
                 override val sampleRate: Float = outSampleRate.toFloat()
@@ -886,7 +1165,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         } else {
             AudioSystem.getSourceDataLine(format)
         }
-        line.open(format, 65536)
+        line.open(format, 32768)
         return line
     }
 
@@ -935,6 +1214,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     }
 
     fun stopInternal() {
+        backgroundLufsJob?.cancel()
         stopPlaybackStreamsOnly()
         _isPlaying.value = false
         _progress.value = 0f
@@ -953,7 +1233,9 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         return try {
             if (!cacheFile.exists()) return HashMap()
             val listType = object : TypeToken<List<CachedTrackEntry>>() {}.type
-            val list: List<CachedTrackEntry>? = gson.fromJson(cacheFile.readText(), listType)
+            val list: List<CachedTrackEntry>? = cacheFile.bufferedReader(Charsets.UTF_8, 16384).use {
+                gson.fromJson(it, listType)
+            }
             val map = HashMap<String, CachedTrackEntry>((list?.size ?: 16) * 2)
             list?.forEach { map[it.path] = it }
             map
@@ -965,7 +1247,14 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     private fun saveTrackCache(map: Map<String, CachedTrackEntry>) {
         try {
             if (!configDir.exists()) configDir.mkdirs()
-            cacheFile.writeText(gson.toJson(map.values.toList()))
+            val tmpFile = File(configDir, "desktop_library_cache.json.tmp")
+            tmpFile.bufferedWriter(Charsets.UTF_8, 16384).use { writer ->
+                gson.toJson(map.values, writer)
+            }
+            if (!tmpFile.renameTo(cacheFile)) {
+                tmpFile.copyTo(cacheFile, overwrite = true)
+                tmpFile.delete()
+            }
         } catch (_: Exception) {
         }
     }
@@ -973,13 +1262,32 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     companion object {
         private fun resolveConfigDirectory(): File {
             val os = System.getProperty("os.name").orEmpty().lowercase(Locale.ROOT)
-            return if (os.contains("win")) {
+            val (flowDir, legacyLuneDir) = if (os.contains("win")) {
                 val appData = System.getenv("APPDATA")
-                if (!appData.isNullOrBlank()) File(appData, "Lune") else File(System.getProperty("user.home"), ".lune")
+                if (!appData.isNullOrBlank()) {
+                    File(appData, "Flow") to File(appData, "Lune")
+                } else {
+                    File(System.getProperty("user.home"), ".flow") to File(System.getProperty("user.home"), ".lune")
+                }
             } else {
                 val xdg = System.getenv("XDG_CONFIG_HOME")
-                if (!xdg.isNullOrBlank()) File(xdg, "lune") else File(File(System.getProperty("user.home"), ".config"), "lune")
+                if (!xdg.isNullOrBlank()) {
+                    File(xdg, "flow") to File(xdg, "lune")
+                } else {
+                    val cfg = File(System.getProperty("user.home"), ".config")
+                    File(cfg, "flow") to File(cfg, "lune")
+                }
             }
+            // Seamless one-time migration from legacy Lune config directory if present
+            if (!flowDir.exists() && legacyLuneDir.exists()) {
+                runCatching {
+                    flowDir.mkdirs()
+                    legacyLuneDir.listFiles()?.forEach { f ->
+                        if (f.isFile) f.copyTo(File(flowDir, f.name), overwrite = false)
+                    }
+                }
+            }
+            return flowDir
         }
 
         private fun detectModestDesktopHardware(): Boolean {
@@ -988,8 +1296,13 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
             return cores <= 2 || maxMemMb <= 256L
         }
 
-        private fun detectFfmpegBinary(): String? {
-            val candidates = listOf("ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "ffmpeg.exe")
+        private fun detectFfmpegBinary(): String? =
+            probeExecutable(listOf("ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "ffmpeg.exe"))
+
+        private fun detectFfprobeBinary(): String? =
+            probeExecutable(listOf("ffprobe", "/usr/bin/ffprobe", "/usr/local/bin/ffprobe", "ffprobe.exe"))
+
+        private fun probeExecutable(candidates: List<String>): String? {
             for (bin in candidates) {
                 try {
                     val p = ProcessBuilder(bin, "-version")

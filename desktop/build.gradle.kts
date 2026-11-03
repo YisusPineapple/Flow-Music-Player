@@ -31,14 +31,18 @@ compose.desktop {
     application {
         mainClass = "com.demonlab.lune.desktop.MainKt"
 
+        // Strict sub-256MB total RSS memory profile for Windows & Linux (incl. modest dual-core / 2GB RAM PCs)
         jvmArgs += listOf(
             "-XX:+UseG1GC",
             "-XX:MaxGCPauseMillis=25",
             "-XX:G1HeapRegionSize=1m",
+            "-XX:MinHeapFreeRatio=10",
+            "-XX:MaxHeapFreeRatio=30",
             "-XX:CICompilerCount=2",
             "-XX:+UseStringDeduplication",
-            "-Xms24m",
-            "-Xmx160m"
+            "-XX:MaxMetaspaceSize=96m",
+            "-Xms20m",
+            "-Xmx128m"
         )
 
         nativeDistributions {
@@ -48,16 +52,16 @@ compose.desktop {
                 TargetFormat.Deb,
                 TargetFormat.AppImage
             )
-            packageName = "Lune"
-            packageVersion = "1.5.4"
-            description = "Lune Ultra-Lightweight Multiplatform Offline Music Player (Windows & Linux)"
-            vendor = "DemonLab"
+            packageName = "Flow"
+            packageVersion = "2.0.0"
+            description = "Flow Ultra-Lightweight Multiplatform Music Player (Fork of Lune)"
+            vendor = "Flow Audio Project"
 
             linux {
                 modules("java.desktop", "java.logging", "jdk.unsupported")
             }
             windows {
-                menuGroup = "Lune"
+                menuGroup = "Flow"
                 upgradeUuid = "8f4b211a-90d4-432b-b95c-71a0e92c3481"
             }
         }
