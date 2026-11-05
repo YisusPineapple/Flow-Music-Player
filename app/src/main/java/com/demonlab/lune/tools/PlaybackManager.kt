@@ -115,6 +115,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val sPos = if (isShuffle) currentShufflePosition else -1
         val fCount = frontQueueInsertCount
         val qSec = queueSections
+        val rIds = recentlyPlayed.map { it.id }
 
         managerScope.launch(Dispatchers.IO) {
             playbackStateSaver.save(
@@ -130,7 +131,8 @@ class PlaybackManager private constructor(private val context: Context) {
                     frontQueueInsertCount = fCount,
                     wasPlaying = wasPlaying,
                     queueSections = qSec,
-                    savedSong = current
+                    savedSong = current,
+                    recentSongIds = rIds
                 )
             )
         }
@@ -198,6 +200,11 @@ class PlaybackManager private constructor(private val context: Context) {
         isQueueFinished = false
         isPlaying = false
         stateRestored = true
+
+        if (recentlyPlayed.isEmpty() && saved.recentSongIds.isNotEmpty() && songPool.isNotEmpty()) {
+            val restoredRecent = saved.recentSongIds.mapNotNull { id -> songPool.find { it.id == id } }
+            recentlyPlayed.addAll(restoredRecent)
+        }
 
         // If music is already playing in service, do NOT disrupt it
         if (musicService?.isPlaying() == true || musicService?.hasPlayer() == true) {

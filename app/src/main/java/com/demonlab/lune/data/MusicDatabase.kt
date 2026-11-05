@@ -127,6 +127,9 @@ interface PlaybackStatsDao {
     @Query("SELECT * FROM playback_stats WHERE type = :type ORDER BY totalTimeMs DESC LIMIT :limit")
     fun getTopByTimeFlow(type: String, limit: Int): kotlinx.coroutines.flow.Flow<List<PlaybackStats>>
 
+    @Query("SELECT * FROM playback_stats WHERE type = :type ORDER BY lastPlayed DESC LIMIT :limit")
+    fun getRecentByLastPlayedFlow(type: String, limit: Int): kotlinx.coroutines.flow.Flow<List<PlaybackStats>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStats(stats: PlaybackStats)
 }

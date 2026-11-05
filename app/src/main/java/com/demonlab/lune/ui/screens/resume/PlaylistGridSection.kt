@@ -18,7 +18,13 @@ import androidx.compose.ui.unit.dp
 import com.demonlab.lune.R
 import com.demonlab.lune.data.Playlist
 import com.demonlab.lune.ui.playlist.PlaylistPreviewCovers
-import com.demonlab.lune.ui.utils.bounceClick
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import com.demonlab.lune.ui.utils.expressiveItemInteraction
 import com.demonlab.lune.ui.viewmodels.MusicViewModel
 
 @Composable
@@ -48,12 +54,34 @@ fun PlaylistGridSection(
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
             items(playlistInfo, key = { it.first.id }) { (playlist, songCount) ->
-                PlaylistCard(
-                    playlist = playlist,
-                    songCount = songCount,
-                    viewModel = viewModel,
-                    onClick = { onPlaylistClick(playlist) }
-                )
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + slideInHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        initialOffsetX = { (it / 2).coerceAtMost(140) }
+                    ) + scaleIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        ),
+                        initialScale = 0.92f
+                    )
+                ) {
+                    PlaylistCard(
+                        playlist = playlist,
+                        songCount = songCount,
+                        viewModel = viewModel,
+                        onClick = { onPlaylistClick(playlist) }
+                    )
+                }
             }
         }
     }
@@ -68,14 +96,14 @@ private fun PlaylistCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 4.dp,
         shadowElevation = 4.dp,
         modifier = Modifier
             .width(150.dp)
             .height(190.dp)
-            .bounceClick()
+            .expressiveItemInteraction(scaleDown = 0.95f, alphaDown = 0.88f)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             PlaylistPreviewCovers(

@@ -142,6 +142,74 @@ fun Modifier.bounceClick(
         }
 }
 
+/**
+ * Material 3 Expressive interactive motion:
+ * Provides a coupled spring scale-down and opacity reduction upon press/interaction,
+ * with playful spring restoration upon release.
+ */
+fun Modifier.expressiveItemInteraction(
+    scaleDown: Float = 0.96f,
+    alphaDown: Float = 0.88f,
+    dampingRatio: Float = Spring.DampingRatioMediumBouncy,
+    stiffness: Float = Spring.StiffnessMediumLow
+): Modifier = composed {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val settingsManager = remember(context) { com.demonlab.lune.tools.SettingsManager.getInstance(context) }
+    val ultraSaver = remember(context, settingsManager.performanceProfile) {
+        settingsManager.isUltraSaverActive(context)
+    }
+    if (ultraSaver) return@composed this
+
+    val lowResource = remember(context, settingsManager.performanceProfile) {
+        settingsManager.isLowResourceVisualsActive(context)
+    }
+    val scale = remember { Animatable(1f) }
+    val alphaAnim = remember { Animatable(1f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    this
+        .graphicsLayer {
+            scaleX = scale.value
+            scaleY = scale.value
+            alpha = alphaAnim.value
+        }
+        .pointerInput(scaleDown, alphaDown, dampingRatio, stiffness, lowResource) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                val animJob = coroutineScope.launch {
+                    launch {
+                        scale.animateTo(
+                            targetValue = scaleDown,
+                            animationSpec = if (lowResource) tween(durationMillis = 70) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        )
+                    }
+                    launch {
+                        alphaAnim.animateTo(
+                            targetValue = alphaDown,
+                            animationSpec = if (lowResource) tween(durationMillis = 70) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        )
+                    }
+                }
+                waitForUpOrCancellation()
+                animJob.cancel()
+                coroutineScope.launch {
+                    launch {
+                        scale.animateTo(
+                            targetValue = 1f,
+                            animationSpec = if (lowResource) tween(durationMillis = 100) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        )
+                    }
+                    launch {
+                        alphaAnim.animateTo(
+                            targetValue = 1f,
+                            animationSpec = if (lowResource) tween(durationMillis = 100) else spring(dampingRatio = dampingRatio, stiffness = stiffness)
+                        )
+                    }
+                }
+            }
+        }
+}
+
 class MaterialExpressiveScallopShape(
     private val lobes: Int = 8,
     private val amplitude: Float = 0.07f

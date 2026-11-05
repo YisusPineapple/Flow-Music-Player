@@ -19,6 +19,7 @@ data class SavedPlaybackState(
     val wasPlaying: Boolean = false,
     val queueSections: List<QueuedSection> = emptyList(),
     val savedSong: Song? = null,
+    val recentSongIds: List<Long> = emptyList()
 )
 
 class PlaybackStateSaver(private val prefs: SharedPreferences) {

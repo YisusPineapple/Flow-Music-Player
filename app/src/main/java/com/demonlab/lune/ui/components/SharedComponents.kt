@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.demonlab.lune.ui.utils.bounceClick
+import com.demonlab.lune.ui.utils.expressiveItemInteraction
 import androidx.compose.ui.draw.blur
 import com.demonlab.lune.R
 import com.demonlab.lune.tools.PlaybackManager
@@ -390,12 +391,12 @@ fun SongItem(
                 onClick = { onClick?.invoke() },
                 onLongClick = { onLongClick() }
             )
-            .bounceClick(scaleDown = 0.96f)
+            .expressiveItemInteraction(scaleDown = 0.96f, alphaDown = 0.88f)
     } else {
         modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPad, vertical = verticalPad)
-            .bounceClick(scaleDown = 0.96f)
+            .expressiveItemInteraction(scaleDown = 0.96f, alphaDown = 0.88f)
     }
 
     Surface(

@@ -11,8 +11,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.demonlab.lune.ui.utils.bounceClick
+import com.demonlab.lune.ui.utils.expressiveItemInteraction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -326,52 +333,93 @@ fun PlaylistListScreen(
                 }
             }
 
+            val isActive = playbackManager.activePlaylistId == playlist.id
             val itemTitleColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
             val itemSubtitleColor = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+            val itemBg = if (hasBlurBackground) {
+                if (isActive) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f)
+            } else {
+                if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            }
+            val activeBorder = if (isActive) {
+                BorderStroke(1.5.dp, if (hasBlurBackground) Color.White.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+            } else null
 
-            ListItem(
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                supportingContent = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.MusicNote, 
-                            null, 
-                            modifier = Modifier.size(14.dp),
-                            tint = itemSubtitleColor
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "$songCount • ${formatLongDuration(totalDuration)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = itemSubtitleColor
-                        )
-                    }
-                },
-                leadingContent = { 
-                    Box(contentAlignment = Alignment.Center) {
-                        PlaylistPreviewCovers(playlist.id, viewModel, 56.dp)
-                        if (playbackManager.activePlaylistId == playlist.id) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(2.dp)
-                                    .size(16.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                    .border(2.dp, if (hasBlurBackground) Color.Transparent else MaterialTheme.colorScheme.surface, CircleShape)
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.combinedClickable(
-                    onClick = { onPlaylistClick(playlist) },
-                    onLongClick = { selectedOptionsPlaylist = playlist }
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ) + slideInVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    initialOffsetY = { (it / 3).coerceAtMost(100) }
+                ) + scaleIn(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    ),
+                    initialScale = 0.94f
                 )
             ) {
-                Text(
-                    playlist.name,
-                    fontWeight = FontWeight.SemiBold,
-                    color = itemTitleColor
-                )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = itemBg,
+                    border = activeBorder,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .expressiveItemInteraction(scaleDown = 0.96f, alphaDown = 0.88f)
+                        .combinedClickable(
+                            onClick = { onPlaylistClick(playlist) },
+                            onLongClick = { selectedOptionsPlaylist = playlist }
+                        )
+                ) {
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        supportingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.MusicNote, 
+                                    null, 
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (isActive && !hasBlurBackground) MaterialTheme.colorScheme.primary else itemSubtitleColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "$songCount • ${formatLongDuration(totalDuration)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = itemSubtitleColor
+                                )
+                            }
+                        },
+                        leadingContent = { 
+                            Box(contentAlignment = Alignment.Center) {
+                                PlaylistPreviewCovers(playlist.id, viewModel, 56.dp)
+                                if (isActive) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(2.dp)
+                                            .size(16.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                            .border(2.dp, if (hasBlurBackground) Color.Transparent else MaterialTheme.colorScheme.surface, CircleShape)
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        Text(
+                            playlist.name,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isActive && !hasBlurBackground) MaterialTheme.colorScheme.primary else itemTitleColor
+                        )
+                    }
+                }
             }
         }
     }

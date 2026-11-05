@@ -110,6 +110,11 @@
     <string name="stop_on_task_removed">Detener reproducción al cerrar</string>
     <string name="stop_on_task_removed_desc">Detiene la música y retira los controles multimedia al deslizar la app de recientes</string>
     <string name="resume_recently_added">Agregadas Recientemente</string>
+    <string name="resume_recents_title">Recientes</string>
+    <string name="resume_recents_subtitle">Últimas canciones escuchadas</string>
+    <string name="resume_recents_empty_desc">Tus canciones escuchadas recientemente aparecerán aquí con controles instantáneos</string>
+    <string name="resume_recents_play_all">Reproducir todo</string>
+    <string name="resume_recents_badge">Escuchadas</string>
     <string name="tab_all">Todo</string>
     <string name="tab_favorites">Favoritos</string>
     <string name="tab_songs">Canciones</string>

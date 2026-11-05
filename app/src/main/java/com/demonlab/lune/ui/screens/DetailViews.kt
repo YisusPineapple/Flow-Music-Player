@@ -2,6 +2,12 @@ package com.demonlab.lune.ui.screens
 
 import android.os.Vibrator
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -408,20 +414,42 @@ fun PlaylistDetailView(
                     itemsIndexed(currentPlaylistSongs, key = { _, it -> it.id }) { index, song ->
                         val isFirst = index == 0
                         val isLast = index == currentPlaylistSongs.lastIndex
-                        SongItem(
-                            isFirst = isFirst,
-                            isLast = isLast,
-                            song = song, 
-                            currentlyPlaying = song.id == currentlyPlayingId, 
-                            isPlaying = isPlaying,
-                            hasBlurBackground = hasBlurBackground,
-                            useCustomControlsColor = useCustomControlsColor,
-                            controlsColorPalette = controlsColorPalette,
-                            onClick = { onSongClick(song, currentPlaylistSongs) },
-                            onOptionsClick = { onOptionsClick(song) },
-                            onFavoriteClick = onFavoriteClick,
-                            modifier = if (isCustomOrder) Modifier.reorderableItem(reorderState, index + 1) else Modifier
-                        )
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            ) + slideInVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                initialOffsetY = { (it / 3).coerceAtMost(80) }
+                            ) + scaleIn(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                initialScale = 0.95f
+                            )
+                        ) {
+                            SongItem(
+                                isFirst = isFirst,
+                                isLast = isLast,
+                                song = song, 
+                                currentlyPlaying = song.id == currentlyPlayingId, 
+                                isPlaying = isPlaying,
+                                hasBlurBackground = hasBlurBackground,
+                                useCustomControlsColor = useCustomControlsColor,
+                                controlsColorPalette = controlsColorPalette,
+                                onClick = { onSongClick(song, currentPlaylistSongs) },
+                                onOptionsClick = { onOptionsClick(song) },
+                                onFavoriteClick = onFavoriteClick,
+                                modifier = if (isCustomOrder) Modifier.reorderableItem(reorderState, index + 1) else Modifier
+                            )
+                        }
                     }
                 }
             }

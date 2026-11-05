@@ -109,6 +109,11 @@
     <string name="stop_on_task_removed">Stop playback when closed</string>
     <string name="stop_on_task_removed_desc">Stops playback and dismisses media controls when the app is swiped away from recent apps</string>
     <string name="resume_recently_added">Recently Added</string>
+    <string name="resume_recents_title">Recents</string>
+    <string name="resume_recents_subtitle">Recently played songs</string>
+    <string name="resume_recents_empty_desc">Your recently listened songs will appear here with instant controls</string>
+    <string name="resume_recents_play_all">Play all</string>
+    <string name="resume_recents_badge">Listened</string>
     <string name="tab_all">All</string>
     <string name="tab_favorites">Favorites</string>
     <string name="tab_folders">Folders</string>

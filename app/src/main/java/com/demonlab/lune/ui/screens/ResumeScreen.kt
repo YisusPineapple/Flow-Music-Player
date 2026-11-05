@@ -20,6 +20,7 @@ import com.demonlab.lune.data.Playlist
 import com.demonlab.lune.tools.PlaybackManager
 import com.demonlab.lune.tools.Song
 import com.demonlab.lune.ui.screens.resume.HeroSection
+import com.demonlab.lune.ui.screens.resume.RecentlyPlayedSection
 import com.demonlab.lune.ui.screens.resume.PlaylistGridSection
 import com.demonlab.lune.ui.screens.resume.RecommendationSection
 import com.demonlab.lune.ui.screens.resume.RecentlyAddedSection
@@ -164,6 +165,29 @@ fun ResumeScreen(
         allSongs.count { it.isFavorite }
     }
 
+    val recentSongs = remember(playbackManager.recentlyPlayed.toList(), viewModel.recentSongStats, allSongs, currentSong) {
+        val list = mutableListOf<Song>()
+        currentSong?.let { list.add(it) }
+
+        val liveRecents = playbackManager.recentlyPlayed.toList()
+        if (liveRecents.isNotEmpty()) {
+            liveRecents.forEach { s ->
+                if (list.none { it.id == s.id }) list.add(s)
+            }
+        } else {
+            val songMap = allSongs.associateBy { it.id }
+            viewModel.recentSongStats.forEach { stat ->
+                val idStr = stat.id.replace("SONG_", "")
+                idStr.toLongOrNull()?.let { songId ->
+                    songMap[songId]?.let { s ->
+                        if (list.none { it.id == s.id }) list.add(s)
+                    }
+                }
+            }
+        }
+        list.take(20)
+    }
+
     val settingsManager = remember { com.demonlab.lune.tools.SettingsManager.getInstance(context) }
     val prefs = remember(context) { context.getSharedPreferences("lune_settings", Context.MODE_PRIVATE) }
     var showHeroSection by remember { mutableStateOf(settingsManager.showHeroSection) }
@@ -208,6 +232,23 @@ fun ResumeScreen(
                 allSongs = allSongs,
                 onContinueListening = onExpandPlayer,
                 onPlayToggle = onPlayToggle
+            )
+        }
+
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn() + slideInVertically { it / 2 }
+        ) {
+            RecentlyPlayedSection(
+                recentSongs = recentSongs,
+                currentSong = currentSong,
+                isPlaying = isPlaying,
+                hasBlurBackground = hasBlurBackground,
+                onSongClick = { song -> onSongClick(song, if (recentSongs.isNotEmpty()) recentSongs else allSongs) },
+                onPlayAll = {
+                    val targetList = if (recentSongs.isNotEmpty()) recentSongs else (if (recommendations.isNotEmpty()) recommendations else allSongs)
+                    targetList.firstOrNull()?.let { s -> onSongClick(s, targetList) }
+                }
             )
         }
 
