@@ -1,26 +1,15 @@
-Lune is a minimalist and elegant music player for Android, designed with a focus on aesthetics and a premium user experience. It features a modern Jetpack Compose UI, dynamic color support, and a unique high-quality dark defocus widget system.
+Flow Music Player is an ultra-lightweight, audiophile-grade offline music player for Android, forked from the open-source Lune project (GPLv3).
 
-- Modern UI
-- Widget
-- Live Lyrics
-- Dynamic Themes
-- Queue Control
-- Playlist
-- Automix and Crossfade
-- Timer playback
-- Equalize
-- Vizulizer
-- Sample button theme
-- HI-FI audio
-- Customizations
-- Support Android Auto
-- haptic vibration
+Key Features:
+- Sample-accurate Gapless playback with next-track queue pre-buffering
+- ReplayGain 1.0/2.0, EBU R128, SoundCheck & real-time BS.1770 LUFS volume normalization
+- Conflict-free Multi-Artist & Multi-Genre indexing with customizable Whitelist and title feat. extraction
+- Extended codec & container playback: ALAC, AIFF, CAF, DSD (DSF/DFF), APE, WavPack, MKV/MKA, MP4, M4A, WebM, Stereo & 5.1/7.1 Opus, E-AC3, AC-3, AC-4, DTS, WMA, FLAC, WAV, OGG, AAC, and MP3
+- Adaptive Material 3 UI for compact phones, landscape mode, foldables, and tablets
+- Responsive home-screen widget, synchronized LRC & embedded lyrics, 10-band Equalizer, Bass Boost, Spatial Audio, Reverb, and Dynamics Processing
+- Ultra-Saver and Light Mode profiles engineered for modest and older devices
 
-Built with privacy as a core principle:
-
-- Zero Internet Access: The app does not hold the `INTERNET` permission. It never connects to any network, server, or service.
-- No Trackers: Zero analytics SDKs, no telemetry, no crash reporters, no ads — nothing phones home.
-- 100% Offline: All audio is played from your device's local storage. No streaming, no account required, no cloud dependency.
-- No Data Collection: Lune does not collect, store, or transmit any personal data. Everything stays on your device.
-- Open Source: The entire source code is publicly available for audit. What you see is what you get.
-- Minimal Permissions: Only the permissions strictly necessary for local music playback and audio visualization are requested.
+Privacy First:
+- Zero Internet Access: Does not request the INTERNET permission
+- Zero Trackers, Zero Ads, 100% Offline local playback
+- Open Source under GPLv3 (fork of https://github.com/MrDemonc/Lune)

@@ -492,5 +492,97 @@ class CoreEngineUnitTest {
         }
         return buf.array()
     }
+
+    @Test
+    fun replayGainTagServiceReadsJaudiotaggerFilesLufsTagsAndComputesLinearPlaybackGain() {
+        // 1. Direct LUFS tag conversion relative to -18.0 LUFS reference
+        assertEquals(-4.0f, com.demonlab.lune.core.dsp.ReplayGainTagService.parseLufsTagToReplayGainDb("-14.0 LUFS") ?: 0f, 0.01f)
+        assertEquals(3.5f, com.demonlab.lune.core.dsp.ReplayGainTagService.parseLufsTagToReplayGainDb("-21.5 LKFS") ?: 0f, 0.01f)
+
+        // 2. Write real ID3v24 TXXX ReplayGain tags into a temporary WAV file and read via ReplayGainTagService
+        val tempRgWav = java.io.File.createTempFile("flow_rg_test_", ".wav")
+        val tempLufsWav = java.io.File.createTempFile("flow_lufs_test_", ".wav")
+        try {
+            tempRgWav.writeBytes(buildMinimalStereoWav16Le(frames = 64))
+            val rgAudioFile = org.jaudiotagger.audio.AudioFileIO.read(tempRgWav)
+            val id3Rg = org.jaudiotagger.tag.id3.ID3v24Tag()
+            fun addTxxx(tag: org.jaudiotagger.tag.id3.ID3v24Tag, desc: String, value: String) {
+                val frame = org.jaudiotagger.tag.id3.ID3v24Frame("TXXX")
+                frame.body = org.jaudiotagger.tag.id3.framebody.FrameBodyTXXX(0.toByte(), desc, value)
+                tag.addFrame(frame)
+            }
+            addTxxx(id3Rg, "REPLAYGAIN_TRACK_GAIN", "-6.25 dB")
+            addTxxx(id3Rg, "REPLAYGAIN_TRACK_PEAK", "0.94")
+            addTxxx(id3Rg, "REPLAYGAIN_ALBUM_GAIN", "-4.50 dB")
+            addTxxx(id3Rg, "REPLAYGAIN_ALBUM_PEAK", "0.98")
+            val wavTagRg = (rgAudioFile.tagOrCreateAndSetDefault as org.jaudiotagger.tag.wav.WavTag)
+            wavTagRg.iD3Tag = id3Rg
+            rgAudioFile.commit()
+
+            val parsedRg = com.demonlab.lune.core.dsp.ReplayGainTagService.readFromFile(tempRgWav)
+            assertTrue("Expected embedded ReplayGain tags to be detected", parsedRg.hasEmbeddedTags)
+            assertEquals(-6.25f, parsedRg.trackGainDb ?: 0f, 0.02f)
+            assertEquals(0.94f, parsedRg.trackPeak ?: 0f, 0.01f)
+            assertEquals(-4.50f, parsedRg.albumGainDb ?: 0f, 0.02f)
+            assertEquals(0.98f, parsedRg.albumPeak ?: 0f, 0.01f)
+
+            val linearTrack = com.demonlab.lune.core.dsp.ReplayGainTagService.computeTotalLinearGain(
+                metadata = parsedRg,
+                config = ReplayGainConfig(mode = ReplayGainMode.TRACK, preventClipping = true)
+            )
+            // 10^(-6.25 / 20) ~= 0.48697
+            assertEquals(0.487f, linearTrack, 0.01f)
+
+            // 3. Write real ID3v24 TXXX LUFS tag (without REPLAYGAIN_*) and verify LUFS -> ReplayGain conversion
+            tempLufsWav.writeBytes(buildMinimalStereoWav16Le(frames = 64))
+            val lufsAudioFile = org.jaudiotagger.audio.AudioFileIO.read(tempLufsWav)
+            val id3Lufs = org.jaudiotagger.tag.id3.ID3v24Tag()
+            addTxxx(id3Lufs, "LUFS", "-12.5 LUFS")
+            val wavTagLufs = (lufsAudioFile.tagOrCreateAndSetDefault as org.jaudiotagger.tag.wav.WavTag)
+            wavTagLufs.iD3Tag = id3Lufs
+            lufsAudioFile.commit()
+
+            val parsedLufs = com.demonlab.lune.core.dsp.ReplayGainTagService.readFromFile(tempLufsWav)
+            assertEquals(-5.5f, parsedLufs.trackGainDb ?: 0f, 0.02f)
+
+            val linearLufs = com.demonlab.lune.core.dsp.ReplayGainTagService.computeTotalLinearGain(
+                metadata = parsedLufs,
+                config = ReplayGainConfig(mode = ReplayGainMode.TRACK, preventClipping = true)
+            )
+            // 10^(-5.5 / 20) ~= 0.53088
+            assertEquals(0.531f, linearLufs, 0.01f)
+
+            // 4. Verify positive boost (> 1.0f) when peak headroom allows vs peak clamping
+            val quietMeta = ReplayGainEngine.fromRawTags(rgTrackGain = "+6.0 dB", rgTrackPeak = "0.35")
+            val boostLinear = com.demonlab.lune.core.dsp.ReplayGainTagService.computeTotalLinearGain(
+                metadata = quietMeta,
+                config = ReplayGainConfig(mode = ReplayGainMode.TRACK, preventClipping = true)
+            )
+            assertTrue("Expected quiet track with 0.35 peak to boost near 2.0x, got $boostLinear", boostLinear > 1.95f)
+        } finally {
+            tempRgWav.delete()
+            tempLufsWav.delete()
+        }
+    }
+
+    private fun buildMinimalStereoWav16Le(frames: Int): ByteArray {
+        val dataBytes = frames * 4
+        val buf = java.nio.ByteBuffer.allocate(44 + dataBytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buf.put("RIFF".toByteArray(Charsets.US_ASCII))
+        buf.putInt(36 + dataBytes)
+        buf.put("WAVE".toByteArray(Charsets.US_ASCII))
+        buf.put("fmt ".toByteArray(Charsets.US_ASCII))
+        buf.putInt(16)
+        buf.putShort(1) // PCM
+        buf.putShort(2) // Stereo
+        buf.putInt(44100)
+        buf.putInt(44100 * 4)
+        buf.putShort(4)
+        buf.putShort(16)
+        buf.put("data".toByteArray(Charsets.US_ASCII))
+        buf.putInt(dataBytes)
+        repeat(frames * 2) { buf.putShort(1024) }
+        return buf.array()
+    }
 }
 

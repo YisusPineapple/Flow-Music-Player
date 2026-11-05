@@ -27,6 +27,7 @@ import com.demonlab.lune.audio.ReplayGainScanner
 import com.demonlab.lune.audio.ReverbEffect
 import com.demonlab.lune.core.dsp.CrossfadeCurveEngine
 import com.demonlab.lune.core.dsp.ReplayGainEngine
+import com.demonlab.lune.core.dsp.ReplayGainTagService
 import com.demonlab.lune.core.format.AudioFormatRegistry
 import com.demonlab.lune.core.model.CoreAudioProfile
 import com.demonlab.lune.core.model.CrossfadeConfig
@@ -97,6 +98,7 @@ class MusicService : MediaBrowserServiceCompat() {
     private var activeReplayGainMetadata: ReplayGainMetadata? = null
     private var activeReplayGainResult: ReplayGainResult = ReplayGainResult(0f, 1f, 0, false, "OFF")
     private var replayGainAnalyzeJob: Job? = null
+    private var gaplessPrebufferJob: Job? = null
 
     private lateinit var settingsManager: SettingsManager
     private lateinit var audioManager: AudioManager
@@ -107,10 +109,6 @@ class MusicService : MediaBrowserServiceCompat() {
     private var widgetUpdateJob: Job? = null
     private var spatialRampJob: Job? = null
     private var currentSpatialStrength: Short = 0
-    private var lastSongForBlur: Song? = null
-    private var lastBlurredBitmap: Bitmap? = null
-    private var lastSongForRounded: Song? = null
-    private var cachedRoundedArt: Bitmap? = null
     private var currentNotificationArt: Bitmap? = null
     private var currentNotificationArtSongId: Long? = null
     private var becomingNoisyReceiver: BroadcastReceiver? = null
@@ -126,13 +124,30 @@ class MusicService : MediaBrowserServiceCompat() {
         return firstAlbum.isNotBlank() && list.take(6).all { it.album.equals(firstAlbum, ignoreCase = true) }
     }
 
+    private fun shouldRouteThroughExtendedPlayer(song: Song): Boolean {
+        val extension = song.path.substringAfterLast('.', song.format).lowercase().trim()
+        if (AudioFormatRegistry.prefersExtendedDecoderOnAndroid(extension, song.channels ?: 2)) {
+            return true
+        }
+        val pm = PlaybackManager.getInstance(applicationContext)
+        if (!settingsManager.isGaplessEnabled) return false
+        val crossfadeOrAutomixActive = pm.isCrossfade || pm.isAutomix
+        return !crossfadeOrAutomixActive || (settingsManager.isGaplessAlbumPriority && isAlbumSequentialPlayback())
+    }
+
     private fun recalculateActiveReplayGain(applyImmediately: Boolean = true) {
         val pm = PlaybackManager.getInstance(applicationContext)
         val config = settingsManager.toReplayGainConfig()
-        val computed = ReplayGainEngine.computeLinearMultiplier(
+        val albumContext = isAlbumSequentialPlayback()
+        val computed = ReplayGainTagService.computePlaybackAdjustment(
             metadata = activeReplayGainMetadata,
             config = config,
-            isAlbumSequentialContext = isAlbumSequentialPlayback()
+            isAlbumSequentialContext = albumContext
+        )
+        val totalLinearGain = ReplayGainTagService.computeTotalLinearGain(
+            metadata = activeReplayGainMetadata,
+            config = config,
+            isAlbumSequentialContext = albumContext
         )
         activeReplayGainResult = computed
         pm.activeReplayGainDb = computed.appliedGainDb
@@ -141,17 +156,19 @@ class MusicService : MediaBrowserServiceCompat() {
 
         if (applyImmediately) {
             val (left, right) = getCurrentTargetVolumes()
+            val (balLeft, balRight) = getBalanceAndDuckVolumes()
             if (!isCrossfading) {
                 mediaPlayer?.setVolume(left, right)
                 secondaryPlayer?.setVolume(left, right)
             }
-            extendedPlayer?.setStereoVolume(left, right)
+            extendedPlayer?.setTrackReplayGainScalar(totalLinearGain, immediate = false)
+            extendedPlayer?.setStereoVolume(balLeft, balRight)
             syncEffectiveLoudnessStage()
         }
     }
 
     private fun syncEffectiveLoudnessStage() {
-        val rgBoostMb = activeReplayGainResult.postBoostMillibels
+        val rgBoostMb = if (extendedPlayer?.isActive == true) 0 else activeReplayGainResult.postBoostMillibels
         val manualGainMb = if (settingsManager.isLoudnessEnabled) settingsManager.loudnessGain else 0
         val totalGainMb = (manualGainMb + rgBoostMb).coerceIn(0, 2400)
         val shouldEnable = settingsManager.isLoudnessEnabled || rgBoostMb > 0
@@ -178,12 +195,76 @@ class MusicService : MediaBrowserServiceCompat() {
         }
     }
 
-    internal fun getCurrentTargetVolumes(): Pair<Float, Float> {
+    private fun syncExoGaplessQueue() {
+        val ext = extendedPlayer ?: return
+        if (!ext.isActive) return
+        val pm = PlaybackManager.getInstance(applicationContext)
+        if (pm.shouldLoopCurrentSong()) {
+            gaplessPrebufferJob?.cancel()
+            ext.queueNextGapless(null)
+            return
+        }
+        val activeSong = pm.currentSong
+        val nextSong = pm.getNextSong()
+        val useGapless = nextSong != null && AudioFormatRegistry.shouldUseGaplessTransition(
+            gaplessEnabled = settingsManager.isGaplessEnabled,
+            crossfadeEnabled = pm.isCrossfade,
+            automixEnabled = pm.isAutomix,
+            respectAlbumGapless = settingsManager.isGaplessAlbumPriority,
+            isShuffleActive = pm.isShuffle,
+            currentAlbum = activeSong?.album,
+            currentTrackNumber = activeSong?.trackNumber ?: 0,
+            nextAlbum = nextSong.album,
+            nextTrackNumber = nextSong.trackNumber
+        )
+        if (!useGapless) {
+            gaplessPrebufferJob?.cancel()
+            ext.queueNextGapless(null)
+            return
+        }
+
+        val config = settingsManager.toReplayGainConfig()
+        val albumSeq = isAlbumSequentialPlayback()
+        val cachedMeta = ReplayGainScanner.getCachedForSong(applicationContext, nextSong)
+        val initialNextGain = ReplayGainTagService.computeTotalLinearGain(
+            metadata = cachedMeta,
+            config = config,
+            isAlbumSequentialContext = albumSeq
+        )
+        val alreadyQueuedSameSong = ext.queuedNextSongId == nextSong.id
+        ext.queueNextGapless(nextSong, initialNextGain)
+
+        if (!alreadyQueuedSameSong && settingsManager.replayGainMode != 0 && !cachedMeta.hasEmbeddedTags) {
+            gaplessPrebufferJob?.cancel()
+            gaplessPrebufferJob = serviceScope.launch {
+                val resolvedNextMeta = ReplayGainScanner.resolveOrAnalyzeSong(
+                    context = applicationContext,
+                    song = nextSong,
+                    allowFallbackDecode = false
+                )
+                if (extendedPlayer?.queuedNextSongId == nextSong.id) {
+                    val refinedNextGain = ReplayGainTagService.computeTotalLinearGain(
+                        metadata = resolvedNextMeta,
+                        config = settingsManager.toReplayGainConfig(),
+                        isAlbumSequentialContext = isAlbumSequentialPlayback()
+                    )
+                    extendedPlayer?.queueNextGapless(nextSong, refinedNextGain)
+                }
+            }
+        }
+    }
+
+    internal fun getBalanceAndDuckVolumes(): Pair<Float, Float> {
         val balance = PlaybackManager.getInstance(applicationContext).balance
         val (left, right) = BalanceEffect.volumesForBalance(balance)
         val duckFactor = if (isDucked) 0.2f else 1.0f
+        return (left * duckFactor) to (right * duckFactor)
+    }
+
+    internal fun getCurrentTargetVolumes(): Pair<Float, Float> {
+        val (balLeft, balRight) = getBalanceAndDuckVolumes()
         val rgScalar = activeReplayGainResult.linearVolumeScalar.coerceIn(0.05f, 1.0f)
-        return (left * duckFactor * rgScalar) to (right * duckFactor * rgScalar)
+        return (balLeft * rgScalar) to (balRight * rgScalar)
     }
 
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
@@ -199,20 +280,26 @@ class MusicService : MediaBrowserServiceCompat() {
                 pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Notification/brief sound: lower volume
-                isDucked = true
-                val (left, right) = getCurrentTargetVolumes()
-                mediaPlayer?.setVolume(left, right)
-                secondaryPlayer?.setVolume(left, right)
-                extendedPlayer?.setStereoVolume(left, right)
+                if (settingsManager.audioDuckingEnabled) {
+                    isDucked = true
+                    val (left, right) = getCurrentTargetVolumes()
+                    val (balLeft, balRight) = getBalanceAndDuckVolumes()
+                    mediaPlayer?.setVolume(left, right)
+                    secondaryPlayer?.setVolume(left, right)
+                    extendedPlayer?.setStereoVolume(balLeft, balRight)
+                } else {
+                    wasPlayingBeforeLoss = isPlaying()
+                    pause()
+                }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 // Regained focus: restore volume and resume if we were playing
                 isDucked = false
                 val (left, right) = getCurrentTargetVolumes()
+                val (balLeft, balRight) = getBalanceAndDuckVolumes()
                 mediaPlayer?.setVolume(left, right)
                 secondaryPlayer?.setVolume(left, right)
-                extendedPlayer?.setStereoVolume(left, right)
+                extendedPlayer?.setStereoVolume(balLeft, balRight)
                 if (wasPlayingBeforeLoss) {
                     resume()
                     wasPlayingBeforeLoss = false
@@ -247,7 +334,7 @@ class MusicService : MediaBrowserServiceCompat() {
         val channelId = "music_playback_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId, "Music Playback", NotificationManager.IMPORTANCE_LOW
+                channelId, "Flow Music Playback", NotificationManager.IMPORTANCE_LOW
             )
             ContextCompat.getSystemService(this, NotificationManager::class.java)
                 ?.createNotificationChannel(channel)
@@ -256,7 +343,9 @@ class MusicService : MediaBrowserServiceCompat() {
         becomingNoisyReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY && isPlaying()) {
-                    PlaybackManager.getInstance(applicationContext).pause()
+                    if (settingsManager.pauseOnNoisyDisconnect) {
+                        PlaybackManager.getInstance(applicationContext).pause()
+                    }
                 }
             }
         }
@@ -278,6 +367,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 if (song != null) {
                     showNotification(song, isPlaying())
                 }
+                syncExoGaplessQueue()
                 updatePlaybackState()
             }
         }
@@ -290,6 +380,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 } else {
                     recalculateActiveReplayGain(applyImmediately = false)
                 }
+                syncExoGaplessQueue()
             }
         }
     }
@@ -378,7 +469,7 @@ class MusicService : MediaBrowserServiceCompat() {
         } catch (e: Exception) { e.printStackTrace() }
 
         try {
-            val rgBoostMb = activeReplayGainResult.postBoostMillibels
+            val rgBoostMb = if (extendedPlayer?.isActive == true) 0 else activeReplayGainResult.postBoostMillibels
             val manualGainMb = if (settingsManager.isLoudnessEnabled) settingsManager.loudnessGain else 0
             val effectiveLoudnessMb = (manualGainMb + rgBoostMb).coerceIn(0, 2400)
             val effectiveLoudnessOn = settingsManager.isLoudnessEnabled || rgBoostMb > 0
@@ -406,6 +497,36 @@ class MusicService : MediaBrowserServiceCompat() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
+    private fun ensureForegroundSafetyNotification() {
+        val pm = PlaybackManager.getInstance(this)
+        val song = currentSong() ?: pm.currentSong ?: pm.pendingPlaySong
+        if (song != null) {
+            showNotification(song, true)
+            return
+        }
+        val channelId = "music_playback_channel"
+        val fallbackNotification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.no_song_playing))
+            .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1, fallbackNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(1, fallbackNotification)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         ensureMediaSession()
@@ -415,14 +536,27 @@ class MusicService : MediaBrowserServiceCompat() {
         }
         val action = intent?.action
         val pm = PlaybackManager.getInstance(this)
+        if (pm.currentSong == null && !pm.stateRestored) {
+            runCatching { pm.restorePlaybackState() }
+        }
 
         when (action) {
-            ACTION_PLAY -> resume()
+            ACTION_PLAY -> {
+                ensureForegroundSafetyNotification()
+                resume()
+            }
             ACTION_PAUSE -> pause()
-            ACTION_PREVIOUS -> pm.playPreviousFromService()
-            ACTION_NEXT -> pm.playNextFromService()
+            ACTION_PREVIOUS -> {
+                ensureForegroundSafetyNotification()
+                pm.playPreviousFromService()
+            }
+            ACTION_NEXT -> {
+                ensureForegroundSafetyNotification()
+                pm.playNextFromService()
+            }
             ACTION_SHUFFLE -> {
                 pm.toggleShuffle()
+                syncExoGaplessQueue()
                 currentSong()?.let { showNotification(it, isPlaying()) }
                 updatePlaybackState()
             }
@@ -444,14 +578,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 updatePlaybackState()
             }
             ACTION_UPDATE_WIDGET -> {
-                val pm = PlaybackManager.getInstance(this)
-                if (pm.currentSong == null && !pm.stateRestored) {
-                    pm.restorePlaybackState()
-                }
-                lastSongForRounded = null
-                lastSongForBlur = null
-                cachedRoundedArt = null
-                lastBlurredBitmap = null
+                LuneWidgetProvider.invalidateArtCache()
                 updateWidget()
             }
             else -> {
@@ -677,6 +804,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_GROUP
             if (pm.isShuffle != shouldShuffle) {
                 pm.toggleShuffle()
+                syncExoGaplessQueue()
                 currentSong()?.let { showNotification(it, isPlaying()) }
                 updatePlaybackState()
             }
@@ -690,6 +818,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 PlaybackStateCompat.REPEAT_MODE_GROUP -> 2
                 else -> 0
             }
+            syncExoGaplessQueue()
             updatePlaybackState()
         }
 
@@ -698,6 +827,7 @@ class MusicService : MediaBrowserServiceCompat() {
             when (action) {
                 ACTION_SHUFFLE -> {
                     pm.toggleShuffle()
+                    syncExoGaplessQueue()
                     currentSong()?.let { showNotification(it, isPlaying()) }
                     updatePlaybackState()
                 }
@@ -809,6 +939,8 @@ class MusicService : MediaBrowserServiceCompat() {
                 if (target != null) {
                     pm.updateCurrentSongState(target)
                     scheduleReplayGainResolution(target)
+                    // Immediately pre-buffer the subsequent (N+2) track in ExoPlayer's queue
+                    syncExoGaplessQueue()
                     serviceScope.launch {
                         val art = fetchAlbumArt(target)
                         updateMetadata(target, art)
@@ -860,11 +992,17 @@ class MusicService : MediaBrowserServiceCompat() {
     private fun playViaExtendedPlayer(song: Song, startPositionMs: Long = 0L, autoPlay: Boolean = true) {
         val pm = PlaybackManager.getInstance(applicationContext)
         val ext = ensureExtendedPlayer()
+        val initialRgScalar = ReplayGainTagService.computeTotalLinearGain(
+            metadata = activeReplayGainMetadata,
+            config = settingsManager.toReplayGainConfig(),
+            isAlbumSequentialContext = isAlbumSequentialPlayback()
+        )
         ext.playSong(
             song = song,
             loopSingle = pm.shouldLoopCurrentSong(),
             speed = pm.playbackSpeed,
-            pitch = pm.playbackPitch
+            pitch = pm.playbackPitch,
+            initialReplayGainScalar = initialRgScalar
         )
         if (startPositionMs > 0L) {
             ext.seekTo(startPositionMs.toInt())
@@ -873,6 +1011,8 @@ class MusicService : MediaBrowserServiceCompat() {
             ext.pause()
         }
         applyBalance(pm.balance)
+        syncEffectiveLoudnessStage()
+        syncExoGaplessQueue()
         if (autoPlay) {
             startWidgetUpdateTimer()
         } else {
@@ -992,15 +1132,11 @@ class MusicService : MediaBrowserServiceCompat() {
         gaplessAttachedSong = null
         isPrebuffering = false
 
-        val extension = song.path.substringAfterLast('.', song.format).lowercase()
-        val preferExtended = AudioFormatRegistry.prefersExtendedDecoderOnAndroid(
-            extension = extension,
-            channels = song.channels ?: 2
-        )
-        if (preferExtended) {
+        if (shouldRouteThroughExtendedPlayer(song)) {
             playViaExtendedPlayer(song, startPositionMs = 0L, autoPlay = true)
             return
         } else {
+            gaplessPrebufferJob?.cancel()
             extendedPlayer?.release()
         }
 
@@ -1167,21 +1303,8 @@ class MusicService : MediaBrowserServiceCompat() {
                 val mp = mediaPlayer
 
                 if (ext != null && ext.isActive && ext.isPlaying) {
-                    val activeSong = playbackManager.currentSong
-                    val nextSong = if (playbackManager.shouldLoopCurrentSong()) null else playbackManager.getNextSong()
-                    val useGapless = nextSong != null && AudioFormatRegistry.shouldUseGaplessTransition(
-                        gaplessEnabled = settingsManager.isGaplessEnabled,
-                        crossfadeEnabled = playbackManager.isCrossfade,
-                        automixEnabled = playbackManager.isAutomix,
-                        respectAlbumGapless = settingsManager.isGaplessAlbumPriority,
-                        isShuffleActive = playbackManager.isShuffle,
-                        currentAlbum = activeSong?.album,
-                        currentTrackNumber = activeSong?.trackNumber ?: 0,
-                        nextAlbum = nextSong.album,
-                        nextTrackNumber = nextSong.trackNumber
-                    )
-                    ext.queueNextGapless(if (useGapless) nextSong else null)
-                    delay(if (settingsManager.isLowResourceVisualsActive(applicationContext)) 800L else 500L)
+                    syncExoGaplessQueue()
+                    delay(if (settingsManager.isLowResourceVisualsActive(applicationContext)) 900L else 600L)
                     continue
                 }
 
@@ -1228,7 +1351,7 @@ class MusicService : MediaBrowserServiceCompat() {
                         nextTrackNumber = nextSong.trackNumber
                     )
 
-                    if (useGapless && nextSong != null && !isCrossfading && duration > 2500) {
+                    if (useGapless && !isCrossfading && duration > 2500) {
                         val rawRemaining = (duration - currentPos).toLong()
                         if (rawRemaining in 1L..5000L) {
                             if (prebufferedSongId != nextSong.id) {
@@ -1282,7 +1405,7 @@ class MusicService : MediaBrowserServiceCompat() {
 
                             val targetFadeMs = computeEffectiveFadeDurationMs(activeSong, nextSong)
 
-                            if (nextSong != null && targetFadeMs > 0L && duration > targetFadeMs + 2500L) {
+                            if (targetFadeMs > 0L && duration > targetFadeMs + 2500L) {
                                 val rawRemaining = (duration - currentPos).toLong()
                                 val effectiveRemaining = (rawRemaining - tailOffsetMs).coerceAtLeast(1L)
 
@@ -1663,6 +1786,7 @@ class MusicService : MediaBrowserServiceCompat() {
         try {
             mediaPlayer?.isLooping = looping
             extendedPlayer?.setLooping(looping)
+            syncExoGaplessQueue()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -1808,12 +1932,12 @@ class MusicService : MediaBrowserServiceCompat() {
         gaplessAttachedSongId = null
         gaplessAttachedSong = null
 
-        val extension = song.path.substringAfterLast('.', song.format).lowercase()
-        if (AudioFormatRegistry.prefersExtendedDecoderOnAndroid(extension, song.channels ?: 2)) {
+        if (shouldRouteThroughExtendedPlayer(song)) {
             playViaExtendedPlayer(song, startPositionMs = positionMs, autoPlay = andPlay)
             PlaybackManager.getInstance(applicationContext).updatePlayingState(andPlay)
             return
         } else {
+            gaplessPrebufferJob?.cancel()
             extendedPlayer?.release()
         }
 
@@ -2227,7 +2351,7 @@ class MusicService : MediaBrowserServiceCompat() {
         val channelId = "music_playback_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId, "Music Playback", NotificationManager.IMPORTANCE_LOW
+                channelId, "Flow Music Playback", NotificationManager.IMPORTANCE_LOW
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
@@ -2254,6 +2378,9 @@ class MusicService : MediaBrowserServiceCompat() {
         val pm = PlaybackManager.getInstance(this)
         val isShuffleOn = pm.isShuffle
         val isFav = song.isFavorite
+        val multiTagCfg = settingsManager.toMultiTagConfig()
+        val displayTitle = song.effectiveDisplayTitle(multiTagCfg)
+        val displayArtist = song.parsedArtists(multiTagCfg).joinToString(", ").ifBlank { song.artist }
 
         val shuffleAction = NotificationCompat.Action(
             if (isShuffleOn) R.drawable.ic_shuffle_on else R.drawable.ic_shuffle,
@@ -2268,10 +2395,10 @@ class MusicService : MediaBrowserServiceCompat() {
         )
 
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setLargeIcon(effectiveArt)
-            .setContentTitle(song.title)
-            .setContentText(song.artist)
+            .setContentTitle(displayTitle)
+            .setContentText(displayArtist)
             .setOngoing(isPlaying)
             .setContentIntent(pendingIntent)
             .setDeleteIntent(getServicePendingIntent(ACTION_DISMISS))
@@ -2346,6 +2473,7 @@ class MusicService : MediaBrowserServiceCompat() {
         spatialRampJob?.cancel()
         pauseTimeoutJob?.cancel()
         replayGainAnalyzeJob?.cancel()
+        gaplessPrebufferJob?.cancel()
         try {
             PlaybackManager.getInstance(applicationContext).savePlaybackState(wasPlaying = false)
             runCatching { mediaPlayer?.setNextMediaPlayer(null) }
@@ -2404,6 +2532,7 @@ class MusicService : MediaBrowserServiceCompat() {
         effectTransitionJob?.cancel()
         effectTransitionJob = serviceScope.launch {
             val (baseLeft, baseRight) = getCurrentTargetVolumes()
+            val (baseBalLeft, baseBalRight) = getBalanceAndDuckVolumes()
             try {
                 // Micro fade-out: smoothly attenuate to 0 over ~18ms (3 steps x 6ms)
                 val steps = 3
@@ -2412,7 +2541,7 @@ class MusicService : MediaBrowserServiceCompat() {
                     val scale = step.toFloat() / steps
                     mediaPlayer?.setVolume(baseLeft * scale, baseRight * scale)
                     secondaryPlayer?.setVolume(baseLeft * scale, baseRight * scale)
-                    extendedPlayer?.setStereoVolume(baseLeft * scale, baseRight * scale)
+                    extendedPlayer?.setStereoVolume(baseBalLeft * scale, baseBalRight * scale)
                     delay(stepDelay)
                 }
                 mediaPlayer?.setVolume(0f, 0f)
@@ -2429,20 +2558,45 @@ class MusicService : MediaBrowserServiceCompat() {
                 for (step in 1..steps) {
                     val scale = step.toFloat() / steps
                     val (curLeft, curRight) = getCurrentTargetVolumes()
+                    val (curBalLeft, curBalRight) = getBalanceAndDuckVolumes()
                     mediaPlayer?.setVolume(curLeft * scale, curRight * scale)
                     secondaryPlayer?.setVolume(curLeft * scale, curRight * scale)
-                    extendedPlayer?.setStereoVolume(curLeft * scale, curRight * scale)
+                    extendedPlayer?.setStereoVolume(curBalLeft * scale, curBalRight * scale)
                     delay(stepDelay)
                 }
             } finally {
                 if (!isCrossfading) {
                     val (curLeft, curRight) = getCurrentTargetVolumes()
+                    val (curBalLeft, curBalRight) = getBalanceAndDuckVolumes()
                     mediaPlayer?.setVolume(curLeft, curRight)
                     secondaryPlayer?.setVolume(curLeft, curRight)
-                    extendedPlayer?.setStereoVolume(curLeft, curRight)
+                    extendedPlayer?.setStereoVolume(curBalLeft, curBalRight)
                 }
             }
         }
+    }
+
+    fun syncExtendedPlayerEqDsp() {
+        val ext = extendedPlayer ?: return
+        val enabled = settingsManager.isEqEnabled
+        val rawLevels = settingsManager.eqBandLevels.split(",").mapNotNull { it.trim().toFloatOrNull() }
+        val gainsDb = FloatArray(5) { i ->
+            val mB = rawLevels.getOrNull(i) ?: 0f
+            (mB / 100.0f).coerceIn(-15f, 15f)
+        }
+        val preamp = settingsManager.eqPreampDb
+        val autoHeadroom = settingsManager.eqAutoHeadroom
+        val bbAmount = if (settingsManager.isBassBoostEnabled) {
+            (settingsManager.bassBoostLevel.toFloat() / 1000f).coerceIn(0f, 1f)
+        } else 0f
+
+        ext.syncEqualizerDsp(
+            enabled = enabled,
+            bandGainsDb = gainsDb,
+            preampDb = preamp,
+            autoHeadroom = autoHeadroom,
+            bassBoostAmount = bbAmount
+        )
     }
 
     fun setEqEnabled(enabled: Boolean) {
@@ -2456,6 +2610,7 @@ class MusicService : MediaBrowserServiceCompat() {
             equalizer?.enabled = true
             secondaryEqualizer?.enabled = true
         }
+        syncExtendedPlayerEqDsp()
     }
 
     fun setEqBandLevel(band: Short, level: Short) {
@@ -2463,6 +2618,7 @@ class MusicService : MediaBrowserServiceCompat() {
             equalizer?.setBandLevel(band, level)
             secondaryEqualizer?.setBandLevel(band, level)
         } catch (e: Exception) { e.printStackTrace() }
+        syncExtendedPlayerEqDsp()
     }
 
     fun useEqPreset(presetIndex: Short) {
@@ -2470,6 +2626,7 @@ class MusicService : MediaBrowserServiceCompat() {
             equalizer?.usePreset(presetIndex)
             secondaryEqualizer?.usePreset(presetIndex)
         } catch (e: Exception) { e.printStackTrace() }
+        syncExtendedPlayerEqDsp()
     }
 
     fun setBassBoostEnabled(enabled: Boolean, onBeforeDisable: (() -> Unit)? = null) {
@@ -2490,6 +2647,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 secondaryBassBoost?.setStrength(settingsManager.bassBoostLevel.toShort())
             }
         }
+        syncExtendedPlayerEqDsp()
     }
 
     fun setBassBoostStrength(strength: Short) {
@@ -2499,6 +2657,7 @@ class MusicService : MediaBrowserServiceCompat() {
         if (secondaryBassBoost?.strengthSupported == true) {
             secondaryBassBoost?.setStrength(strength)
         }
+        syncExtendedPlayerEqDsp()
     }
 
     fun setReverbPreset(preset: Int) {
@@ -2525,13 +2684,15 @@ class MusicService : MediaBrowserServiceCompat() {
 
     fun applyBalance(balance: Float) {
         val (left, right) = getCurrentTargetVolumes()
+        val (balLeft, balRight) = getBalanceAndDuckVolumes()
         mediaPlayer?.setVolume(left, right)
         secondaryPlayer?.setVolume(left, right)
-        extendedPlayer?.setStereoVolume(left, right)
+        extendedPlayer?.setStereoVolume(balLeft, balRight)
     }
 
     fun setLoudnessEnabled(enabled: Boolean, onBeforeDisable: (() -> Unit)? = null) {
-        if (!enabled && activeReplayGainResult.postBoostMillibels <= 0) {
+        val rgBoostMb = if (extendedPlayer?.isActive == true) 0 else activeReplayGainResult.postBoostMillibels
+        if (!enabled && rgBoostMb <= 0) {
             executeEffectTransition(true) {
                 onBeforeDisable?.invoke()
                 loudnessEffect?.setEnabled(false)
@@ -2544,7 +2705,7 @@ class MusicService : MediaBrowserServiceCompat() {
     }
 
     fun setLoudnessGain(gain: Int) {
-        val rgBoostMb = activeReplayGainResult.postBoostMillibels
+        val rgBoostMb = if (extendedPlayer?.isActive == true) 0 else activeReplayGainResult.postBoostMillibels
         val manualMb = if (settingsManager.isLoudnessEnabled) gain else 0
         loudnessEffect?.setTargetGain((manualMb + rgBoostMb).coerceIn(0, 2400))
     }
@@ -2589,10 +2750,12 @@ class MusicService : MediaBrowserServiceCompat() {
 
     private fun startWidgetUpdateTimer() {
         widgetUpdateJob?.cancel()
-        val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-        val hasWidgets = appWidgetManager.getAppWidgetIds(
-            ComponentName(applicationContext, LuneWidgetProvider::class.java)
-        ).isNotEmpty()
+        val hasWidgets = runCatching {
+            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
+            appWidgetManager.getAppWidgetIds(
+                ComponentName(applicationContext, LuneWidgetProvider::class.java)
+            ).isNotEmpty()
+        }.getOrDefault(false)
         if (!hasWidgets) return
 
         val powerManager = getSystemService(POWER_SERVICE) as android.os.PowerManager
@@ -2602,7 +2765,7 @@ class MusicService : MediaBrowserServiceCompat() {
                 if (powerManager.isInteractive) {
                     updateWidget()
                 }
-                delay(if (settingsManager.isLowResourceVisualsActive(applicationContext)) 2500L else 1200L)
+                delay(if (settingsManager.isLowResourceVisualsActive(applicationContext)) 5000L else 3000L)
             }
         }
     }
@@ -2612,151 +2775,14 @@ class MusicService : MediaBrowserServiceCompat() {
     }
 
     private fun updateWidget() {
-        val pm = PlaybackManager.getInstance(applicationContext)
-        if (pm.currentSong == null && !pm.stateRestored) {
-            pm.restorePlaybackState()
-        }
-        val song = currentSong()
-        val isPlaying = isPlaying()
-
         serviceScope.launch {
-            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-            val componentName = ComponentName(applicationContext, LuneWidgetProvider::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-
-            if (appWidgetIds.isEmpty()) return@launch
-
-            // Fetch and process art only if song changed or cache is missing
-            if (song != null && (lastSongForRounded != song || cachedRoundedArt == null)) {
-                val art = fetchAlbumArt(song)
-                if (art != null) {
-                    lastSongForRounded = song
-                    lastSongForBlur = song
-                    withContext(Dispatchers.IO) {
-                        cachedRoundedArt = when {
-                            settingsManager.widgetCircularCover && settingsManager.widgetVinylCover ->
-                                LuneWidgetProvider.getVinylRecordBitmap(art)
-                            settingsManager.widgetCircularCover ->
-                                LuneWidgetProvider.getCircularBitmap(art)
-                            else ->
-                                LuneWidgetProvider.getSquareScaledBitmap(art)
-                        }
-                        val blurRadius = (settingsManager.widgetBackgroundBlur * 0.5f).toInt().coerceIn(3, 50)
-                        lastBlurredBitmap = LuneWidgetProvider.getBlurredBitmap(
-                            applicationContext,
-                            art,
-                            blurRadius,
-                            28,
-                            settingsManager.widgetBackgroundDarkness
-                        )
-                    }
-                } else {
-                    lastSongForRounded = null
-                    lastSongForBlur = null
-                    cachedRoundedArt = null
-                    lastBlurredBitmap = null
-                }
-            } else if (song == null) {
-                lastSongForRounded = null
-                lastSongForBlur = null
-                cachedRoundedArt = null
-                lastBlurredBitmap = null
-            }
-
-            for (appWidgetId in appWidgetIds) {
-                val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-                val layoutResId = LuneWidgetProvider.getWidgetLayoutResId(options)
-                val views = RemoteViews(packageName, layoutResId)
-                LuneWidgetProvider.applyWidgetStyling(applicationContext, views, settingsManager)
-                LuneWidgetProvider.applyWidgetResponsiveLayout(views, options)
-
-                if (song != null) {
-                    views.setTextViewText(R.id.widget_title, song.title)
-                    views.setTextViewText(R.id.widget_artist, song.artist)
-
-                    views.setImageViewResource(R.id.widget_play_pause,
-                        if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
-
-                    // Audio Output
-                    views.setImageViewResource(R.id.widget_output_icon, getOutputIconRes())
-                    views.setTextViewText(R.id.widget_output_text, getOutputName())
-
-                    if (cachedRoundedArt != null) {
-                        views.setImageViewBitmap(R.id.widget_cover, cachedRoundedArt)
-                    } else {
-                        views.setImageViewResource(R.id.widget_cover, R.drawable.ic_lune_placeholder)
-                    }
-
-                    if (settingsManager.widgetUseSolidBackground) {
-                        val isNight = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-                        val solidColor = if (isNight) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-                        views.setImageViewBitmap(R.id.widget_blur_bg, LuneWidgetProvider.getSolidColorBitmap(solidColor))
-                        views.setViewVisibility(R.id.widget_blur_bg, View.VISIBLE)
-                    } else if (lastBlurredBitmap != null) {
-                        views.setImageViewBitmap(R.id.widget_blur_bg, lastBlurredBitmap)
-                        views.setViewVisibility(R.id.widget_blur_bg, View.VISIBLE)
-                    } else {
-                        views.setViewVisibility(R.id.widget_blur_bg, View.GONE)
-                    }
-                } else {
-                    views.setTextViewText(R.id.widget_title, getString(R.string.no_song_playing))
-                    views.setTextViewText(R.id.widget_artist, "")
-
-                    views.setImageViewResource(R.id.widget_cover, R.drawable.ic_lune_placeholder)
-                    if (settingsManager.widgetUseSolidBackground) {
-                        val isNight = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-                        val solidColor = if (isNight) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-                        views.setImageViewBitmap(R.id.widget_blur_bg, LuneWidgetProvider.getSolidColorBitmap(solidColor))
-                        views.setViewVisibility(R.id.widget_blur_bg, View.VISIBLE)
-                    } else {
-                        views.setViewVisibility(R.id.widget_blur_bg, View.GONE)
-                    }
-                }
-
-                // Button Intents
-                views.setOnClickPendingIntent(R.id.widget_play_pause, getWidgetServicePendingIntent(if (isPlaying) ACTION_PAUSE else ACTION_PLAY))
-                views.setOnClickPendingIntent(R.id.widget_prev, getWidgetServicePendingIntent(ACTION_PREVIOUS))
-                views.setOnClickPendingIntent(R.id.widget_next, getWidgetServicePendingIntent(ACTION_NEXT))
-
-                // Open App
-                val intent = Intent(applicationContext, Lune::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                val pendingIntent = PendingIntent.getActivity(applicationContext, 0, intent, PendingIntent.FLAG_IMMUTABLE)
-                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
-
-                appWidgetManager.updateAppWidget(appWidgetId, views)
+            runCatching {
+                LuneWidgetProvider.pushUpdateToAllWidgets(
+                    context = applicationContext,
+                    preloadedArt = currentNotificationArt,
+                    preloadedArtSongId = currentNotificationArtSongId
+                )
             }
         }
-    }
-
-    private fun getWidgetServicePendingIntent(action: String): PendingIntent {
-        return LuneWidgetProvider.getServicePendingIntent(this, action)
-    }
-
-    private fun getOutputIconRes(): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            for (device in devices) {
-                when (device.type) {
-                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> return R.drawable.ic_bluetooth
-                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET -> return R.drawable.ic_headphones
-                }
-            }
-        }
-        return R.drawable.ic_speaker
-    }
-
-    private fun getOutputName(): String {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            for (device in devices) {
-                when (device.type) {
-                    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> return getString(R.string.output_bluetooth)
-                    AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET -> return getString(R.string.output_headphones)
-                }
-            }
-        }
-        return getString(R.string.output_speaker)
     }
 }

@@ -1,1 +1,1 @@
-Modern open source local music player for Android
+Lightweight offline Hi-Fi music player with Gapless & ReplayGain

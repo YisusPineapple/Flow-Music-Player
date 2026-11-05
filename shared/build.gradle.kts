@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
+    kotlin("multiplatform")
 }
 
 kotlin {
@@ -10,7 +10,11 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.jaudiotagger)
+            }
+        }
         val desktopMain by getting
     }
 }

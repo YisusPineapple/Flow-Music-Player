@@ -208,6 +208,9 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.demonlab.lune.WIDGET_UPDATE" />
+                <action android:name="com.demonlab.lune.WIDGET_PLAY_PAUSE" />
+                <action android:name="com.demonlab.lune.WIDGET_PREVIOUS" />
+                <action android:name="com.demonlab.lune.WIDGET_NEXT" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

@@ -5,6 +5,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import com.demonlab.lune.core.dsp.ReplayGainEngine
+import com.demonlab.lune.core.dsp.ReplayGainTagService
 import com.demonlab.lune.core.format.NativePcmContainerDecoder
 import com.demonlab.lune.core.format.SeekableByteReader
 import com.demonlab.lune.core.model.ReplayGainMetadata
@@ -19,7 +20,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.Tag
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -58,22 +58,6 @@ object ReplayGainScanner {
 
     private val _analysisStatus = MutableStateFlow(LibraryAnalysisStatus())
     val analysisStatus: StateFlow<LibraryAnalysisStatus> = _analysisStatus.asStateFlow()
-
-    private val RG_TRACK_GAIN_KEYS = listOf(
-        "REPLAYGAIN_TRACK_GAIN", "replaygain_track_gain", "TXXX:REPLAYGAIN_TRACK_GAIN", "----:com.apple.iTunes:replaygain_track_gain"
-    )
-    private val RG_TRACK_PEAK_KEYS = listOf(
-        "REPLAYGAIN_TRACK_PEAK", "replaygain_track_peak", "TXXX:REPLAYGAIN_TRACK_PEAK", "----:com.apple.iTunes:replaygain_track_peak"
-    )
-    private val RG_ALBUM_GAIN_KEYS = listOf(
-        "REPLAYGAIN_ALBUM_GAIN", "replaygain_album_gain", "TXXX:REPLAYGAIN_ALBUM_GAIN", "----:com.apple.iTunes:replaygain_album_gain"
-    )
-    private val RG_ALBUM_PEAK_KEYS = listOf(
-        "REPLAYGAIN_ALBUM_PEAK", "replaygain_album_peak", "TXXX:REPLAYGAIN_ALBUM_PEAK", "----:com.apple.iTunes:replaygain_album_peak"
-    )
-    private val R128_TRACK_KEYS = listOf("R128_TRACK_GAIN", "r128_track_gain")
-    private val R128_ALBUM_KEYS = listOf("R128_ALBUM_GAIN", "r128_album_gain")
-    private val ITUNNORM_KEYS = listOf("ITUNNORM", "iTunNORM", "COMMENT ITUNNORM", "----:com.apple.iTunes:iTunNORM")
 
     private fun ensureCacheLoaded(context: Context) {
         if (cacheLoaded) return
@@ -142,24 +126,7 @@ object ReplayGainScanner {
         trackGainDb != null || albumGainDb != null
 
     fun extractReplayGainFromTag(tag: Tag?): ReplayGainMetadata {
-        if (tag == null) return ReplayGainMetadata()
-        fun firstCustom(keys: List<String>): String? {
-            for (k in keys) {
-                val v = runCatching { tag.getFirst(k) }.getOrNull()?.trim()
-                if (!v.isNullOrBlank()) return v
-            }
-            return null
-        }
-
-        return ReplayGainEngine.fromRawTags(
-            rgTrackGain = firstCustom(RG_TRACK_GAIN_KEYS),
-            rgTrackPeak = firstCustom(RG_TRACK_PEAK_KEYS),
-            rgAlbumGain = firstCustom(RG_ALBUM_GAIN_KEYS),
-            rgAlbumPeak = firstCustom(RG_ALBUM_PEAK_KEYS),
-            r128TrackGain = firstCustom(R128_TRACK_KEYS),
-            r128AlbumGain = firstCustom(R128_ALBUM_KEYS),
-            iTunNorm = firstCustom(ITUNNORM_KEYS)
-        )
+        return ReplayGainTagService.extractFromTag(tag)
     }
 
     fun getCachedForSong(context: Context, song: Song): ReplayGainMetadata {
@@ -256,14 +223,8 @@ object ReplayGainScanner {
             )
         }
 
-        // Step 1: Fast tag check via Jaudiotagger (no audio decoding)
-        var tagMeta = ReplayGainMetadata()
-        if (file != null && file.exists() && file.canRead()) {
-            tagMeta = runCatching {
-                val af = AudioFileIO.read(file)
-                extractReplayGainFromTag(af.tag)
-            }.getOrDefault(ReplayGainMetadata())
-        }
+        // Step 1: Fast shared commonMain tag check via ReplayGainTagService (jaudiotagger, no audio decoding)
+        val tagMeta = ReplayGainTagService.readFromFile(file)
 
         if (tagMeta.hasEmbeddedTags || !allowFallbackDecode) {
             val entry = CachedLoudnessEntry(

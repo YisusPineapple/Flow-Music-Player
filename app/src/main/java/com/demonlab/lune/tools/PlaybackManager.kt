@@ -307,6 +307,18 @@ class PlaybackManager private constructor(private val context: Context) {
         object : android.media.AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
                 updateAudioOutput()
+                if (settings.resumeOnOutputConnect && !isPlaying && currentSong != null) {
+                    val hasHeadphonesOrBt = addedDevices?.any { dev ->
+                        dev.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                        dev.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                        dev.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                        dev.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                        dev.type == AudioDeviceInfo.TYPE_HEARING_AID
+                    } ?: false
+                    if (hasHeadphonesOrBt) {
+                        resume()
+                    }
+                }
             }
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
                 updateAudioOutput()
@@ -533,14 +545,16 @@ class PlaybackManager private constructor(private val context: Context) {
             return
         }
 
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        val hasPermission = ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val sessionId = musicService?.getAudioSessionId() ?: 0
+
+        if (!hasPermission || sessionId == 0) {
+            startFallbackVisualizerLoop()
             return
         }
 
-        val sessionId = musicService?.getAudioSessionId() ?: 0
-        if (sessionId == 0) return
-
         synchronized(visualizerLock) {
+            stopFallbackVisualizerLoop()
             if (visualizer != null && visualizerSessionId == sessionId) {
                 runCatching { visualizer?.enabled = true }
                 return
@@ -578,8 +592,39 @@ class PlaybackManager private constructor(private val context: Context) {
             } catch (e: Exception) {
                 Log.w("PlaybackManager", "Visualizer init failed for session $sessionId: ${e.message}")
                 releaseVisualizerLocked()
+                startFallbackVisualizerLoop()
             }
         }
+    }
+
+    private var fallbackVisualizerJob: kotlinx.coroutines.Job? = null
+
+    private fun startFallbackVisualizerLoop() {
+        if (fallbackVisualizerJob?.isActive == true || !isPlaying) return
+        fallbackVisualizerJob = managerScope.launch(Dispatchers.Default) {
+            var phase = 0f
+            val barCount = 48
+            val temp = FloatArray(barCount)
+            while (isActive && isPlaying && (isFullPlayerVisualizerEnabled || isMiniPlayerVisualizerEnabled)) {
+                phase += 0.18f
+                val baseEnergy = if (isPlaying) 0.45f else 0.05f
+                for (i in 0 until barCount) {
+                    val freqFactor = (i + 1).toFloat() / barCount
+                    val wave = Math.sin((phase * 2.5f + i * 0.4f).toDouble()).toFloat()
+                    val harmonic = Math.cos((phase * 4.2f + i * 0.8f).toDouble()).toFloat() * 0.3f
+                    val raw = (baseEnergy * (0.6f + 0.4f * wave + harmonic) * (1.1f - freqFactor * 0.4f)).coerceIn(0.08f, 0.95f)
+                    temp[i] = lastMagnitudes[i] + 0.35f * (raw - lastMagnitudes[i])
+                }
+                lastMagnitudes = temp.clone()
+                _visualizerData.value = lastMagnitudes
+                delay(40) // ~25 FPS, extremely low CPU
+            }
+        }
+    }
+
+    private fun stopFallbackVisualizerLoop() {
+        fallbackVisualizerJob?.cancel()
+        fallbackVisualizerJob = null
     }
 
     private fun releaseVisualizerLocked() {
@@ -594,6 +639,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun stopVisualizer() {
+        stopFallbackVisualizerLoop()
         synchronized(visualizerLock) {
             releaseVisualizerLocked()
         }
@@ -1146,14 +1192,36 @@ class PlaybackManager private constructor(private val context: Context) {
         updateLoopingState()
     }
 
-    fun getEqNumberOfBands(): Short = musicService?.equalizer?.numberOfBands ?: 0
-    fun getEqBandLevelRange(): ShortArray? = musicService?.equalizer?.bandLevelRange
-    fun getEqCenterFreq(band: Short): Int = musicService?.equalizer?.getCenterFreq(band) ?: 0
-    fun getEqBandLevel(band: Short): Short = musicService?.equalizer?.getBandLevel(band) ?: 0
+    fun getEqNumberOfBands(): Short {
+        val hw = musicService?.equalizer?.numberOfBands ?: 0
+        return if (hw > 0) hw else 5.toShort()
+    }
+    fun getEqBandLevelRange(): ShortArray? {
+        val hw = musicService?.equalizer?.bandLevelRange
+        return hw ?: shortArrayOf(-1500, 1500)
+    }
+    fun getEqCenterFreq(band: Short): Int {
+        val hw = musicService?.equalizer?.getCenterFreq(band) ?: 0
+        if (hw > 0) return hw
+        return when (band.toInt()) {
+            0 -> 60_000
+            1 -> 230_000
+            2 -> 910_000
+            3 -> 3_600_000
+            4 -> 14_000_000
+            else -> 1_000_000
+        }
+    }
+    fun getEqBandLevel(band: Short): Short {
+        return musicService?.equalizer?.getBandLevel(band)
+            ?: eqBandLevels.getOrNull(band.toInt())
+            ?: 0.toShort()
+    }
 
     fun refreshEqState() {
-        eqBandsCount = musicService?.equalizer?.numberOfBands ?: 0
-        eqBandsRange = musicService?.equalizer?.bandLevelRange
+        val hwBands = musicService?.equalizer?.numberOfBands ?: 0
+        eqBandsCount = if (hwBands > 0) hwBands else 5.toShort()
+        eqBandsRange = musicService?.equalizer?.bandLevelRange ?: shortArrayOf(-1500, 1500)
     }
 
     fun toggleEq() {
@@ -1381,6 +1449,18 @@ class PlaybackManager private constructor(private val context: Context) {
         musicService?.setSpatialAudioEnabled(isSpatialAudioEnabled)
     }
 
+    fun updateEqPreamp(preampDb: Float) {
+        val clamped = preampDb.coerceIn(-12f, 12f)
+        settings.eqPreampDb = clamped
+        musicService?.syncExtendedPlayerEqDsp()
+    }
+
+    fun toggleEqAutoHeadroom() {
+        val newState = !settings.eqAutoHeadroom
+        settings.eqAutoHeadroom = newState
+        musicService?.syncExtendedPlayerEqDsp()
+    }
+
     fun updateReverbPreset(preset: Int) {
         reverbPreset = preset
         settings.reverbPreset = preset
@@ -1585,6 +1665,60 @@ class PlaybackManager private constructor(private val context: Context) {
                     }
                 }
                 mutableShuffle.add(insertPosInShuffle, newIndex)
+                shuffledIndices = mutableShuffle
+            }
+        }
+    }
+
+    fun playNext(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        val current = currentSong
+        if (current == null || activePlaylist.isEmpty()) {
+            play(songs.first(), songs)
+            return
+        }
+        for (song in songs.reversed()) {
+            playNext(song)
+        }
+    }
+
+    fun addToQueue(song: Song) {
+        val current = currentSong
+        if (current == null || activePlaylist.isEmpty()) {
+            play(song)
+            return
+        }
+        val exists = activePlaylist.any { it.id == song.id }
+        if (!exists) {
+            val mutable = activePlaylist.toMutableList()
+            mutable.add(song)
+            activePlaylist = mutable
+            if (isShuffle && shuffledIndices.isNotEmpty()) {
+                val mutableShuffle = shuffledIndices.toMutableList()
+                mutableShuffle.add(mutable.lastIndex)
+                shuffledIndices = mutableShuffle
+            }
+        }
+    }
+
+    fun addToQueue(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        val current = currentSong
+        if (current == null || activePlaylist.isEmpty()) {
+            play(songs.first(), songs)
+            return
+        }
+        val toAdd = songs.filter { s -> activePlaylist.none { it.id == s.id } }
+        if (toAdd.isNotEmpty()) {
+            val mutable = activePlaylist.toMutableList()
+            val startIndex = mutable.size
+            mutable.addAll(toAdd)
+            activePlaylist = mutable
+            if (isShuffle && shuffledIndices.isNotEmpty()) {
+                val mutableShuffle = shuffledIndices.toMutableList()
+                for (i in toAdd.indices) {
+                    mutableShuffle.add(startIndex + i)
+                }
                 shuffledIndices = mutableShuffle
             }
         }

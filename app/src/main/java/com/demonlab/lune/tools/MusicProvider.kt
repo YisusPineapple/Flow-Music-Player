@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.demonlab.lune.audio.ReplayGainScanner
+import com.demonlab.lune.core.dsp.ReplayGainTagService
 import com.demonlab.lune.core.format.NativePcmContainerDecoder
 import com.demonlab.lune.core.format.SeekableByteReader
 import java.io.RandomAccessFile
@@ -286,7 +287,7 @@ class MusicProvider(private val context: Context) {
 
                             val tag = audioFile.tag
                             if (tag != null) {
-                                val rgMeta = com.demonlab.lune.audio.ReplayGainScanner.extractReplayGainFromTag(tag)
+                                val rgMeta = ReplayGainTagService.extractFromTag(tag)
                                 rgTrackDb = rgMeta.trackGainDb
                                 rgTrackPeak = rgMeta.trackPeak
                                 rgAlbumDb = rgMeta.albumGainDb
@@ -364,6 +365,11 @@ class MusicProvider(private val context: Context) {
                     override.genre?.let { if (it.isNotBlank()) genre = it }
                     coverUrl = override.coverUri
                     isFavorite = override.isFavorite
+                }
+
+                val minDurationMs = settingsManager.skipShortTracksSeconds * 1000L
+                if (minDurationMs > 0 && duration in 1 until minDurationMs) {
+                    continue
                 }
 
                 val contentUri: Uri = ContentUris.withAppendedId(collection, id)
@@ -595,7 +601,7 @@ class MusicProvider(private val context: Context) {
                 else -> chStr.filter { it.isDigit() }.toIntOrNull()?.coerceIn(1, 16) ?: 2
             }
             af.tag?.let { t ->
-                rgMeta = com.demonlab.lune.audio.ReplayGainScanner.extractReplayGainFromTag(t)
+                rgMeta = ReplayGainTagService.extractFromTag(t)
                 val artists = runCatching { t.getAll(org.jaudiotagger.tag.FieldKey.ARTIST).map { it.trim() }.filter { it.isNotEmpty() }.distinct() }.getOrDefault(emptyList())
                 if (artists.isNotEmpty()) artist = CharsetUtils.sanitizeText(artists.joinToString("; "))
                 val genres = runCatching { t.getAll(org.jaudiotagger.tag.FieldKey.GENRE).map { it.trim() }.filter { it.isNotEmpty() }.distinct() }.getOrDefault(emptyList())

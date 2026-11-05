@@ -13,46 +13,54 @@ val quicksand = FontFamily(
     Font(R.font.quicksand_bold, FontWeight.Bold)
 )
 
-// Set of Material typography styles to start with
+val spaceGrotesk = FontFamily(
+    Font(R.font.space_grotesk, FontWeight.Normal)
+)
+
+val jetbrainsMono = FontFamily(
+    Font(R.font.jetbrains_mono, FontWeight.Normal)
+)
+
+// Set of Material 3 Expressive typography styles
 val Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.Bold,
         fontSize = 57.sp,
         lineHeight = 64.sp,
         letterSpacing = (-0.25).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.Bold,
         fontSize = 45.sp,
         lineHeight = 52.sp,
         letterSpacing = 0.sp
     ),
     displaySmall = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
     headlineSmall = TextStyle(
-        fontFamily = quicksand,
-        fontWeight = FontWeight.Normal,
+        fontFamily = spaceGrotesk,
+        fontWeight = FontWeight.Medium,
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp

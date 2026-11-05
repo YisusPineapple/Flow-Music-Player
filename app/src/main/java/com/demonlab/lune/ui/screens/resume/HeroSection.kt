@@ -79,6 +79,7 @@ fun HeroSection(
     useCustomControlsColor: Boolean = false,
     controlsColorPalette: Int = 0,
     playbackProgress: Float = 0f,
+    allSongs: List<Song> = emptyList(),
     onContinueListening: () -> Unit,
     onPlayToggle: () -> Unit,
 ) {
@@ -345,6 +346,90 @@ fun HeroSection(
                     hasBlurBackground = hasBlurBackground,
                     isDarkTheme = isDarkTheme
                 )
+            }
+        }
+
+        // M3E Expressive Bento Quick Actions
+        val pmInstance = remember { com.demonlab.lune.tools.PlaybackManager.getInstance(context) }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                onClick = {
+                    if (allSongs.isNotEmpty()) {
+                        val randomSong = allSongs.random()
+                        pmInstance.play(randomSong, allSongs, 0L, category = "ALL", shuffleMode = true)
+                    }
+                },
+                shape = RoundedCornerShape(18.dp),
+                color = if (hasBlurBackground) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp)
+                    .bounceClick()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = stringResource(R.string.quick_shuffle),
+                        tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.quick_shuffle),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Surface(
+                onClick = {
+                    val hiResSongs = allSongs.filter { s: Song -> s.isHiRes || s.isHiFi }
+                    if (hiResSongs.isNotEmpty()) {
+                        val pick = hiResSongs.first()
+                        pmInstance.play(pick, hiResSongs, -888L, category = "HIFI", shuffleMode = false)
+                    } else if (allSongs.isNotEmpty()) {
+                        val pick = allSongs.first()
+                        pmInstance.play(pick, allSongs, 0L, category = "ALL", shuffleMode = false)
+                    }
+                },
+                shape = RoundedCornerShape(18.dp),
+                color = if (hasBlurBackground) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(46.dp)
+                    .bounceClick()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq,
+                        contentDescription = stringResource(R.string.hifi_audio),
+                        tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.hifi_audio),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                        maxLines = 1
+                    )
+                }
             }
         }
 

@@ -686,6 +686,7 @@ fun MainScreen(
     var undoSecondsRemaining by remember { mutableIntStateOf(0) }
     var undoProgress by remember { mutableFloatStateOf(1f) }
     var selectedPlaylist by remember { mutableStateOf<com.demonlab.lune.data.Playlist?>(null) }
+    var selectedSongIds by remember { mutableStateOf(emptySet<Long>()) }
     
     val isDarkThemeMini = when (themeMode) {
         1 -> false
@@ -2136,6 +2137,7 @@ fun MainScreen(
                                         itemsIndexed(pageSortedSongs, key = { _, it -> it.id }) { index, song ->
                                             val isFirst = index == 0
                                             val isLast = index == pageSortedSongs.lastIndex
+                                            val isSongSelected = selectedSongIds.contains(song.id)
                                             SongItem(
                                                 isFirst = isFirst,
                                                 isLast = isLast,
@@ -2145,8 +2147,22 @@ fun MainScreen(
                                                 hasBlurBackground = hasBlurBackgroundMini,
                                                 useCustomControlsColor = useCustomControlsColor,
                                                 controlsColorPalette = controlsColorPalette,
+                                                isSelected = isSongSelected,
+                                                onLongClick = {
+                                                    selectedSongIds = if (isSongSelected) {
+                                                        selectedSongIds - song.id
+                                                    } else {
+                                                        selectedSongIds + song.id
+                                                    }
+                                                },
                                                 onClick = {
-                                                    if (playbackManager.currentSong?.id != song.id || playbackManager.activePlaylistId != pageContextId) {
+                                                    if (selectedSongIds.isNotEmpty()) {
+                                                        selectedSongIds = if (isSongSelected) {
+                                                            selectedSongIds - song.id
+                                                        } else {
+                                                            selectedSongIds + song.id
+                                                        }
+                                                    } else if (playbackManager.currentSong?.id != song.id || playbackManager.activePlaylistId != pageContextId) {
                                                         onCurrentSongChange(song)
                                                         playbackManager.play(song, pageSortedSongs, pageContextId, category = folder, shuffleMode = isShuffleActive)
                                                         onIsPlayingChange(true)
@@ -2629,6 +2645,146 @@ fun MainScreen(
                                         .fillMaxWidth()
                                         .padding(horizontal = 14.dp)
                                 ) {
+                                    if (selectedSongIds.isNotEmpty()) {
+                                        val selectedCount = selectedSongIds.size
+                                        val curList = visibleSongs
+                                        Card(
+                                            shape = RoundedCornerShape(24.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (hasBlurBackgroundMini) Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceContainerHigh
+                                            ),
+                                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                            modifier = Modifier.fillMaxWidth().bounceClick()
+                                        ) {
+                                            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.smart_selection_title, selectedCount),
+                                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = if (hasBlurBackgroundMini) Color.White else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                val selSongs = curList.filter { selectedSongIds.contains(it.id) }
+                                                                playbackManager.playNext(selSongs)
+                                                                Toast.makeText(context, context.getString(R.string.action_play_next) + " (${selSongs.size})", Toast.LENGTH_SHORT).show()
+                                                                selectedSongIds = emptySet()
+                                                            },
+                                                            modifier = Modifier.size(36.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.QueueMusic,
+                                                                contentDescription = stringResource(R.string.action_play_next),
+                                                                tint = if (hasBlurBackgroundMini) Color.White else MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        IconButton(
+                                                            onClick = {
+                                                                val selSongs = curList.filter { selectedSongIds.contains(it.id) }
+                                                                playbackManager.addToQueue(selSongs)
+                                                                Toast.makeText(context, context.getString(R.string.action_add_to_queue) + " (${selSongs.size})", Toast.LENGTH_SHORT).show()
+                                                                selectedSongIds = emptySet()
+                                                            },
+                                                            modifier = Modifier.size(36.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.AutoMirrored.Filled.PlaylistAdd,
+                                                                contentDescription = stringResource(R.string.action_add_to_queue),
+                                                                tint = if (hasBlurBackgroundMini) Color.White else MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        IconButton(
+                                                            onClick = { selectedSongIds = emptySet() },
+                                                            modifier = Modifier.size(36.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.Close,
+                                                                contentDescription = stringResource(R.string.smart_sel_clear),
+                                                                tint = if (hasBlurBackgroundMini) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    item {
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                selectedSongIds = com.demonlab.lune.core.model.SmartSelectionEngine.selectSameAlbum(
+                                                                    allItems = curList,
+                                                                    currentSelectedIds = selectedSongIds,
+                                                                    idSelector = { it.id },
+                                                                    albumSelector = { it.album }
+                                                                )
+                                                            },
+                                                            label = { Text(stringResource(R.string.smart_sel_same_album)) }
+                                                        )
+                                                    }
+                                                    item {
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                selectedSongIds = com.demonlab.lune.core.model.SmartSelectionEngine.selectSameArtist(
+                                                                    allItems = curList,
+                                                                    currentSelectedIds = selectedSongIds,
+                                                                    idSelector = { it.id },
+                                                                    artistsSelector = { it.parsedArtists(multiTagConfig) }
+                                                                )
+                                                            },
+                                                            label = { Text(stringResource(R.string.smart_sel_same_artist)) }
+                                                        )
+                                                    }
+                                                    item {
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                selectedSongIds = com.demonlab.lune.core.model.SmartSelectionEngine.selectSameFolder(
+                                                                    allItems = curList,
+                                                                    currentSelectedIds = selectedSongIds,
+                                                                    idSelector = { it.id },
+                                                                    folderSelector = { it.folderName }
+                                                                )
+                                                            },
+                                                            label = { Text(stringResource(R.string.smart_sel_same_folder)) }
+                                                        )
+                                                    }
+                                                    item {
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                selectedSongIds = com.demonlab.lune.core.model.SmartSelectionEngine.invert(
+                                                                    allIds = curList.map { it.id },
+                                                                    currentSelected = selectedSongIds
+                                                                )
+                                                            },
+                                                            label = { Text(stringResource(R.string.smart_sel_invert)) }
+                                                        )
+                                                    }
+                                                    item {
+                                                        FilterChip(
+                                                            selected = false,
+                                                            onClick = {
+                                                                selectedSongIds = curList.map { it.id }.toSet()
+                                                            },
+                                                            label = { Text(stringResource(R.string.smart_sel_all)) }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
                                     MiniPlayer(
                                         song = song,
                                         isPlaying = isPlaying,

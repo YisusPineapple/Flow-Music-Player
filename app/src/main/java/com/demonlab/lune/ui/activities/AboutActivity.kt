@@ -1,51 +1,76 @@
 package com.demonlab.lune.ui.activities
 
-import android.R.attr.icon
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocalCafe
-import androidx.compose.material.icons.filled.MonetizationOn
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.demonlab.lune.BuildConfig
 import com.demonlab.lune.R
-import com.demonlab.lune.tools.SettingsManager
 import com.demonlab.lune.tools.PlaybackManager
+import com.demonlab.lune.tools.SettingsManager
 import com.demonlab.lune.ui.components.AppBlurBackdrop
 import com.demonlab.lune.ui.theme.LuneTheme
 import com.demonlab.lune.ui.utils.bounceClick
-import androidx.compose.ui.platform.LocalUriHandler
 
 class AboutActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +108,7 @@ class AboutActivity : ComponentActivity() {
                 customColorPalette = customColorPalette,
                 useAmoledPitchBlack = useAmoledPitchBlack
             ) {
-                AboutScreen()
+                AboutScreen(onBack = { finish() })
             }
         }
     }
@@ -91,7 +116,8 @@ class AboutActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen() {
+fun AboutScreen(onBack: () -> Unit = {}) {
+    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val settingsManager = remember { SettingsManager.getInstance(context) }
     val playbackManager = remember { PlaybackManager.getInstance(context) }
@@ -102,10 +128,12 @@ fun AboutScreen() {
         else -> isSystemInDarkTheme()
     }
     val lowResourceVisuals = settingsManager.isLowResourceVisualsActive(context)
-    val hasBlurBackground = !lowResourceVisuals && settingsManager.isBlurEnabled && ((isDarkTheme && settingsManager.isBlurDarkMode) || (!isDarkTheme && settingsManager.isBlurLightMode))
+    val hasBlurBackground = !lowResourceVisuals &&
+        settingsManager.isBlurEnabled &&
+        ((isDarkTheme && settingsManager.isBlurDarkMode) || (!isDarkTheme && settingsManager.isBlurLightMode))
 
     val scrollState = rememberScrollState()
-    var showDonateDialog by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     AppBlurBackdrop(
         hasBlurBackground = hasBlurBackground,
@@ -116,7 +144,28 @@ fun AboutScreen() {
             containerColor = if (hasBlurBackground && currentSong != null) Color.Transparent else MaterialTheme.colorScheme.surface,
             topBar = {
                 TopAppBar(
-                    title = { },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.about),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasBlurBackground && currentSong != null) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .bounceClick()
+                                .testTag("about_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.cancel),
+                                tint = if (hasBlurBackground && currentSong != null) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
                     actions = {
                         IconButton(
                             onClick = {
@@ -125,17 +174,23 @@ fun AboutScreen() {
                                 }
                                 context.startActivity(intent)
                             },
-                            modifier = Modifier.bounceClick()
+                            modifier = Modifier
+                                .bounceClick()
+                                .testTag("about_system_info_button")
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = if (hasBlurBackground && currentSong != null) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                color = if (hasBlurBackground && currentSong != null) {
+                                    Color.White.copy(alpha = 0.15f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                },
                                 modifier = Modifier.size(40.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         Icons.Default.Info,
-                                        contentDescription = "System Settings",
+                                        contentDescription = stringResource(R.string.settings),
                                         tint = if (hasBlurBackground && currentSong != null) Color.White else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(22.dp)
                                     )
@@ -149,489 +204,281 @@ fun AboutScreen() {
                 )
             }
         ) { innerPadding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(innerPadding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                // Logo Section
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(188.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 600.dp)
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val rotation = if (!lowResourceVisuals) {
-                        val infiniteTransition = rememberInfiniteTransition(label = "rotation")
-                        val animRot by infiniteTransition.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(durationMillis = 12000, easing = LinearEasing),
-                                repeatMode = RepeatMode.Restart
-                            ),
-                            label = "diamond_rotation"
-                        )
-                        animRot
-                    } else 0f
-
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_logo_diamonds),
-                        contentDescription = null,
-                        tint = if (hasBlurBackground) Color.White.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .rotate(rotation)
-                    )
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_logo_note),
-                        contentDescription = stringResource(R.string.app_name),
-                        tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(164.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                )
-
-                // Version
-                Text(
-                    text = "${stringResource(R.string.version)} ${BuildConfig.VERSION_NAME}",
-                    fontWeight = FontWeight.Bold,
-                    color = if (hasBlurBackground) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "${stringResource(R.string.license)}: GPLv3",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Buttons
-                val uriHandler = LocalUriHandler.current
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { 
-                            runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune") }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .bounceClick(),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasBlurBackground) (if (isDarkTheme) Color.White.copy(alpha = 0.09f) else Color.Black.copy(alpha = 0.22f)) else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    // Flow Emblem Hero
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(184.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_github),
-                            contentDescription = "GitHub",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Github",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Button(
-                        onClick = { 
-                            runCatching { uriHandler.openUri("https://mrdemonc.github.io/Lune/") }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .bounceClick(),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasBlurBackground) (if (isDarkTheme) Color.White.copy(alpha = 0.09f) else Color.Black.copy(alpha = 0.22f)) else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_web),
-                            contentDescription = stringResource(R.string.website),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.website),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Button(
-                        onClick = { showDonateDialog = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .bounceClick(),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
-                            contentColor = if (hasBlurBackground) Color.Black else MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.LocalCafe,
-                            contentDescription = "Donation",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Donate",
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                if (showDonateDialog) {
-                    DonateDialog(
-                        onDismiss = { showDonateDialog = false },
-                        hasBlurBackground = hasBlurBackground,
-                        isDarkTheme = isDarkTheme
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Fork Attribution Card (Flow -> Fork of https://github.com/MrDemonc/Lune)
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (hasBlurBackground) {
-                        if (isDarkTheme) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.22f)
-                    } else {
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.fork_attribution_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = stringResource(R.string.fork_attribution_desc),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        FilledTonalButton(
-                            onClick = {
-                                runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune") }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.bounceClick()
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_github),
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                        val rotation = if (!lowResourceVisuals) {
+                            val infiniteTransition = rememberInfiniteTransition(label = "flow_emblem_rotation")
+                            val animRot by infiniteTransition.animateFloat(
+                                initialValue = 0f,
+                                targetValue = 360f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(durationMillis = 14000, easing = LinearEasing),
+                                    repeatMode = RepeatMode.Restart
+                                ),
+                                label = "wave_ring_rotation"
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            animRot
+                        } else 0f
+
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_logo_diamonds),
+                            contentDescription = null,
+                            tint = if (hasBlurBackground) {
+                                Color.White.copy(alpha = 0.24f)
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .rotate(rotation)
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_logo_note),
+                            contentDescription = stringResource(R.string.app_name),
+                            tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(152.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Flow Music Player",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (hasBlurBackground) {
+                                Color.White.copy(alpha = 0.16f)
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer
+                            }
+                        ) {
                             Text(
-                                text = stringResource(R.string.fork_open_original_repo),
+                                text = "${stringResource(R.string.version)} ${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (hasBlurBackground) {
+                                Color.White.copy(alpha = 0.12f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            }
+                        ) {
+                            Text(
+                                text = "${stringResource(R.string.license)}: GPLv3",
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = if (hasBlurBackground) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                // Developer Info
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "${stringResource(R.string.author)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.secondary
-                    )
-                    Text(
-                        text = stringResource(R.string.demon),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.creator_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Open-Source Fork Attribution Card (Flow -> Independent Fork of https://github.com/MrDemonc/Lune)
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = if (hasBlurBackground) {
+                            if (isDarkTheme) Color.White.copy(alpha = 0.11f) else Color.Black.copy(alpha = 0.22f)
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.fork_attribution_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = stringResource(R.string.fork_attribution_desc),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (hasBlurBackground) Color.White.copy(alpha = 0.88f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            FilledTonalButton(
+                                onClick = {
+                                    runCatching { uriHandler.openUri("https://github.com/MrDemonc/Lune") }
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier
+                                    .bounceClick()
+                                    .testTag("open_upstream_lune_repo_button")
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_github),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.fork_open_original_repo),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Credits
-                    HorizontalDivider(thickness = 0.5.dp, color = if (hasBlurBackground) Color.White.copy(alpha = 0.20f) else MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = stringResource(R.string.credits),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.secondary濃(0.7f)
-                    )
-                    Text(
-                        text = stringResource(R.string.desukia),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.credits_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Credits & Architecture Info
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = stringResource(R.string.author),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = stringResource(R.string.demon),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.creator_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    HorizontalDivider(thickness = 0.5.dp, color = if (hasBlurBackground) Color.White.copy(alpha = 0.20f) else MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.20f) else MaterialTheme.colorScheme.outlineVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = stringResource(R.string.open_source_libraries),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.secondary濃(0.7f)
-                    )
-                    
-                    // Coil
-                    Text(
-                        text = "Coil",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.coil_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.credits),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = stringResource(R.string.desukia),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.credits_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    // Gson
-                    Text(
-                        text = "Gson",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.gson_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = if (hasBlurBackground) Color.White.copy(alpha = 0.20f) else MaterialTheme.colorScheme.outlineVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Room
-                    Text(
-                        text = "Room",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.room_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.open_source_libraries),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    // Jaudiotagger
-                    Text(
-                        text = "Jaudiotagger",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.jaudiotagger_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        LibraryCreditItem(
+                            name = "AndroidX Media3 / ExoPlayer",
+                            description = "Sample-accurate gapless decoding, multichannel audio extraction, and low-footprint buffering.",
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Jaudiotagger",
+                            description = stringResource(R.string.jaudiotagger_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Jetpack Compose & Compose Multiplatform",
+                            description = stringResource(R.string.compose_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Room",
+                            description = stringResource(R.string.room_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Coil",
+                            description = stringResource(R.string.coil_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Gson",
+                            description = stringResource(R.string.gson_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                        LibraryCreditItem(
+                            name = "Quicksand Font",
+                            description = stringResource(R.string.quicksand_desc),
+                            hasBlurBackground = hasBlurBackground
+                        )
+                    }
 
-                    Text(
-                        text = "Jetpack Compose",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.compose_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Quicksand Font
-                    Text(
-                        text = "Quicksand Font",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.quicksand_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
-
-                Spacer(modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.height(32.dp))
-
             }
         }
     }
 }
 
 @Composable
-fun MaterialTheme.secondary濃(alpha: Float): Color {
-    return colorScheme.secondary.copy(alpha = alpha)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DonateDialog(
-    onDismiss: () -> Unit,
-    hasBlurBackground: Boolean = false,
-    isDarkTheme: Boolean = false
+private fun LibraryCreditItem(
+    name: String,
+    description: String,
+    hasBlurBackground: Boolean
 ) {
-    val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
-    var showMonero by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = if (hasBlurBackground) (if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.95f) else Color(0xFFF5F5F5).copy(alpha = 0.95f)) else MaterialTheme.colorScheme.surfaceContainerHigh,
-        title = {
-            Text(
-                text = stringResource(R.string.donate_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = { uriHandler.openUri("https://paypal.me/TommyZambrano") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .bounceClick(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary,
-                        contentColor = if (hasBlurBackground) Color.Black else MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.LocalCafe,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.paypal), fontWeight = FontWeight.Bold)
-                }
-
-                Button(
-                    onClick = { showMonero = !showMonero },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .bounceClick(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasBlurBackground) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MonetizationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.monero), fontWeight = FontWeight.SemiBold)
-                }
-
-                if (showMonero) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (hasBlurBackground) (if (isDarkTheme) Color.White.copy(alpha = 0.09f) else Color.Black.copy(alpha = 0.22f)) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.monero_address),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (hasBlurBackground) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(
-                                onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("Monero Address", context.getString(R.string.monero_address))
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier.bounceClick()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.ContentCopy,
-                                    contentDescription = stringResource(R.string.copied),
-                                    tint = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            FilledTonalButton(
-                onClick = onDismiss,
-                shape = CircleShape,
-                modifier = Modifier.bounceClick(),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (hasBlurBackground) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            ) {
-                Text(stringResource(R.string.cancel), fontWeight = FontWeight.Bold)
-            }
-        }
+    Text(
+        text = name,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = if (hasBlurBackground) Color.White else MaterialTheme.colorScheme.onSurface
     )
+    Text(
+        text = description,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (hasBlurBackground) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(10.dp))
 }

@@ -36,11 +36,16 @@ import com.demonlab.lune.tools.PlaybackManager
 import com.demonlab.lune.tools.SettingsManager
 import com.demonlab.lune.ui.theme.LuneTheme
 import kotlinx.coroutines.delay
-
 import androidx.compose.ui.graphics.Color
 import com.demonlab.lune.ui.components.AppBlurBackdrop
 import com.demonlab.lune.ui.utils.bounceClick
 import com.demonlab.lune.ui.theme.getControlsPrimaryColor
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.demonlab.lune.core.dsp.SoftwareEqualizerDsp
+import com.demonlab.lune.ui.theme.jetbrainsMono
 
 class EqualizerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -322,6 +327,164 @@ fun EqualizerScreen(onBack: () -> Unit) {
                         }
                     }
                 }
+
+                // M3E Studio Frequency Response Curve Canvas
+                val currentLevels = playbackManager.eqBandLevels
+                val currentPreamp = settingsManager.eqPreampDb
+                val autoHeadroom = settingsManager.eqAutoHeadroom
+                val dspForCurve = remember { SoftwareEqualizerDsp() }
+
+                val curveLineColor = if (useCustomControlsColor) activePrimary else MaterialTheme.colorScheme.primary
+
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (hasBlurBackground && currentSong != null) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            val midY = h / 2f
+
+                            // Draw dB grid lines (-12dB, 0dB, +12dB)
+                            drawLine(
+                                color = textColor.copy(alpha = 0.15f),
+                                start = androidx.compose.ui.geometry.Offset(0f, midY),
+                                end = androidx.compose.ui.geometry.Offset(w, midY),
+                                strokeWidth = 1f
+                            )
+                            drawLine(
+                                color = textColor.copy(alpha = 0.08f),
+                                start = androidx.compose.ui.geometry.Offset(0f, midY - h * 0.35f),
+                                end = androidx.compose.ui.geometry.Offset(w, midY - h * 0.35f),
+                                strokeWidth = 1f
+                            )
+                            drawLine(
+                                color = textColor.copy(alpha = 0.08f),
+                                start = androidx.compose.ui.geometry.Offset(0f, midY + h * 0.35f),
+                                end = androidx.compose.ui.geometry.Offset(w, midY + h * 0.35f),
+                                strokeWidth = 1f
+                            )
+
+                            if (isEnabled) {
+                                dspForCurve.isEnabled = true
+                                val gains = FloatArray(5) { b ->
+                                    val mb = currentLevels.getOrElse(b) { 0.toShort() }.toFloat()
+                                    (mb / 100f).coerceIn(-15f, 15f)
+                                }
+                                dspForCurve.setAllGains(gains)
+                                dspForCurve.preampDb = currentPreamp
+                                dspForCurve.autoHeadroomEnabled = autoHeadroom
+                                dspForCurve.bassBoostAmount = if (playbackManager.isBassBoostEnabled) 0.35f else 0f
+                                dspForCurve.recalculateCoefficients()
+
+                                val path = Path()
+                                val steps = 60
+                                for (s in 0..steps) {
+                                    val t = s.toFloat() / steps
+                                    // Logarithmic frequency from 20 Hz to 20 kHz
+                                    val logFreq = 20f * Math.pow((20000f / 20f).toDouble(), t.toDouble()).toFloat()
+                                    val respDb = dspForCurve.computeFrequencyResponseDb(logFreq)
+                                    val px = t * w
+                                    val py = (midY - (respDb / 15f) * (h * 0.42f)).coerceIn(4f, h - 4f)
+                                    if (s == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                                }
+
+                                drawPath(
+                                    path = path,
+                                    color = curveLineColor,
+                                    style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                            }
+                        }
+
+                        // Curve badge info
+                        Row(
+                            modifier = Modifier.align(Alignment.TopEnd),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isEnabled) (if (currentPreamp >= 0) "+%.1f dB Preamp".format(currentPreamp) else "%.1f dB Preamp".format(currentPreamp)) else "EQ BYPASS",
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = jetbrainsMono),
+                                color = if (isEnabled) (if (useCustomControlsColor) activePrimary else MaterialTheme.colorScheme.primary) else textSecondaryColor
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Preamp and Auto Headroom Quick Controls
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.eq_preamp_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = textColor
+                        )
+                        Text(
+                            text = stringResource(R.string.eq_preamp_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textSecondaryColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "${if (currentPreamp >= 0) "+" else ""}${currentPreamp.toInt()} dB",
+                        style = MaterialTheme.typography.labelLarge.copy(fontFamily = jetbrainsMono),
+                        color = textColor
+                    )
+                }
+                Slider(
+                    value = currentPreamp,
+                    onValueChange = { playbackManager.updateEqPreamp(it) },
+                    valueRange = -12f..12f,
+                    steps = 23,
+                    enabled = isEnabled,
+                    colors = sliderColors
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.eq_auto_headroom_label),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = textColor
+                        )
+                        Text(
+                            text = stringResource(R.string.eq_auto_headroom_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = textSecondaryColor
+                        )
+                    }
+                    BouncySwitch(
+                        checked = autoHeadroom,
+                        onCheckedChange = { playbackManager.toggleEqAutoHeadroom() },
+                        enabled = isEnabled,
+                        thumbContent = {
+                            Icon(
+                                imageVector = if (autoHeadroom) Icons.Default.Check else Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(SwitchDefaults.IconSize)
+                            )
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 if (numBands > 0 && bandRange != null) {
                     val minLevel = bandRange[0]

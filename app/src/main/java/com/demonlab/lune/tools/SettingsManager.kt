@@ -805,6 +805,43 @@ class SettingsManager(context: Context) {
             prefs.edit().putInt("grid_columns_count", coerced).apply()
         }
 
+    // --- New Audio & Behavior Settings ---
+    var eqPreampDb: Float
+        get() = prefs.getFloat("eq_preamp_db", 0f)
+        set(value) = prefs.edit().putFloat("eq_preamp_db", value.coerceIn(-12f, 12f)).apply()
+
+    var eqAutoHeadroom: Boolean
+        get() = prefs.getBoolean("eq_auto_headroom", true)
+        set(value) = prefs.edit().putBoolean("eq_auto_headroom", value).apply()
+
+    var audioDuckingEnabled: Boolean
+        get() = prefs.getBoolean("audio_ducking_enabled", true)
+        set(value) = prefs.edit().putBoolean("audio_ducking_enabled", value).apply()
+
+    var pauseOnNoisyDisconnect: Boolean
+        get() = prefs.getBoolean("pause_on_noisy_disconnect", true)
+        set(value) = prefs.edit().putBoolean("pause_on_noisy_disconnect", value).apply()
+
+    var resumeOnOutputConnect: Boolean
+        get() = prefs.getBoolean("resume_on_output_connect", false)
+        set(value) = prefs.edit().putBoolean("resume_on_output_connect", value).apply()
+
+    var fadeOnPlayPause: Boolean
+        get() = prefs.getBoolean("fade_on_play_pause", true)
+        set(value) = prefs.edit().putBoolean("fade_on_play_pause", value).apply()
+
+    var skipShortTracksSeconds: Int
+        get() = prefs.getInt("skip_short_tracks_seconds", 0) // 0=Off, 15, 30, 60s
+        set(value) = prefs.edit().putInt("skip_short_tracks_seconds", value).apply()
+
+    var expressiveVisualsEnabled: Boolean
+        get() = prefs.getBoolean("expressive_visuals_enabled", true)
+        set(value) = prefs.edit().putBoolean("expressive_visuals_enabled", value).apply()
+
+    var longPressQuickQueueEnabled: Boolean
+        get() = prefs.getBoolean("long_press_quick_queue_enabled", true)
+        set(value) = prefs.edit().putBoolean("long_press_quick_queue_enabled", value).apply()
+
     // --- Ergonomic UI Aliases ---
     var replayGainPreampDb: Float
         get() = replayGainPreAmpDb

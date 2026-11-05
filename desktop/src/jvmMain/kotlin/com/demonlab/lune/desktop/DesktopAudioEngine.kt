@@ -1,7 +1,7 @@
 package com.demonlab.lune.desktop
 
 import com.demonlab.lune.core.dsp.CrossfadeCurveEngine
-import com.demonlab.lune.core.dsp.ReplayGainEngine
+import com.demonlab.lune.core.dsp.ReplayGainTagService
 import com.demonlab.lune.core.dsp.StreamingLufsAnalyzer
 import com.demonlab.lune.core.format.AudioFormatRegistry
 import com.demonlab.lune.core.format.NativePcmContainerDecoder
@@ -221,7 +221,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         applyLineGain(primaryLine, masterVolume)
         _currentSong.value?.let { current ->
             val effectiveMeta = mergeWithComputedOverride(current)
-            _activeReplayGain.value = ReplayGainEngine.computeLinearMultiplier(
+            _activeReplayGain.value = ReplayGainTagService.computePlaybackAdjustment(
                 metadata = effectiveMeta,
                 config = replayGainConfig,
                 isAlbumSequentialContext = true
@@ -373,10 +373,10 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                             } else {
                                 AudioFormatRegistry.downmixPcm16leToStereo(readBuf, n, source.channels, stereoBuf)
                             }
-                            analyzer.processPcm16le(stereoBuf, stValid)
+                            analyzer.processPcm16le(stereoBuf, 0, stValid)
                             processedBytes += stValid
                         }
-                        val measured = analyzer.computeCurrentGainAndPeak()
+                        val measured = analyzer.currentReplayGainDbAndPeak()
                         if (measured != null) {
                             persistComputedLoudness(cachedMap, song.file.absolutePath, measured.first, measured.second, saveNow = false)
                             dirtyCount++
@@ -523,28 +523,20 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
             bitrate = header?.bitRateAsNumber?.let { (it * 1000).toInt() }
             channels = parseChannelCount(header?.channels)
 
-            rgMeta = ReplayGainEngine.fromRawTags(
-                rgTrackGain = readCustomTag(tag, "REPLAYGAIN_TRACK_GAIN", "replaygain_track_gain"),
-                rgTrackPeak = readCustomTag(tag, "REPLAYGAIN_TRACK_PEAK", "replaygain_track_peak"),
-                rgAlbumGain = readCustomTag(tag, "REPLAYGAIN_ALBUM_GAIN", "replaygain_album_gain"),
-                rgAlbumPeak = readCustomTag(tag, "REPLAYGAIN_ALBUM_PEAK", "replaygain_album_peak"),
-                r128TrackGain = readCustomTag(tag, "R128_TRACK_GAIN", "r128_track_gain"),
-                r128AlbumGain = readCustomTag(tag, "R128_ALBUM_GAIN", "r128_album_gain"),
-                iTunNorm = readCustomTag(tag, "iTunNORM", "ITUNNORM")
-            )
+            rgMeta = ReplayGainTagService.extractFromTag(tag)
         }
 
         // 2. Native pure-Kotlin header inspection for AIFF/AIFC, CAF, DSF, DFF, AU
-        if ((durationMs <= 0L || sampleRate == null) && NativePcmContainerDecoder.supportsExtension(ext)) {
+        if ((durationMs <= 0L || sampleRate == null) && NativePcmContainerDecoder.isNativelyDecodableExtension(ext)) {
             runCatching {
                 val raf = RandomAccessFile(file, "r")
                 val reader = rafToSeekableReader(raf)
-                val stream = NativePcmContainerDecoder.open(reader, ext)
+                val stream = NativePcmContainerDecoder.open(reader)
                 if (stream != null) {
                     if (durationMs <= 0L) durationMs = stream.durationMs
-                    if (sampleRate == null) sampleRate = stream.sampleRate
-                    if (bitDepth == null) bitDepth = stream.originalBitDepth
-                    channels = stream.originalChannels.coerceIn(1, 16)
+                    if (sampleRate == null) sampleRate = stream.sourceSampleRate
+                    if (bitDepth == null) bitDepth = if (ext == "dsf" || ext == "dff") 1 else 16
+                    channels = stream.sourceChannels.coerceIn(1, 16)
                     stream.close()
                 } else {
                     raf.close()
@@ -614,15 +606,6 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         } catch (_: Exception) {
             null
         }
-    }
-
-    private fun readCustomTag(tag: org.jaudiotagger.tag.Tag?, vararg keys: String): String? {
-        if (tag == null) return null
-        for (key in keys) {
-            val v = runCatching { tag.getFirst(key) }.getOrNull()
-            if (!v.isNullOrBlank()) return v
-        }
-        return null
     }
 
     private fun parseChannelCount(rawChannels: String?): Int {
@@ -867,17 +850,19 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                         }
 
                         if (lufsAnalyzer != null && !refinedLocked && stereoValidBytes >= 4) {
-                            lufsAnalyzer.processPcm16le(stereoBuf, stereoValidBytes)
-                            if (!earlyLocked && lufsAnalyzer.completedBlocks >= 4) {
+                            lufsAnalyzer.processPcm16le(stereoBuf, 0, stereoValidBytes)
+                            val sr = source.sampleRate.toInt().coerceAtLeast(8000)
+                            val framesSeen = lufsAnalyzer.processedFrames
+                            if (!earlyLocked && framesSeen >= sr * 2L) {
                                 earlyLocked = true
-                                lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                                lufsAnalyzer.currentReplayGainDbAndPeak()?.let { (gainDb, peak) ->
                                     rgMeta = rgMeta.copy(computedLoudnessDb = gainDb, trackPeak = peak)
                                     rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
                                     persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = false)
                                 }
-                            } else if (earlyLocked && lufsAnalyzer.completedBlocks >= 25) {
+                            } else if (earlyLocked && framesSeen >= sr * 10L) {
                                 refinedLocked = true
-                                lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                                lufsAnalyzer.currentReplayGainDbAndPeak()?.let { (gainDb, peak) ->
                                     rgMeta = rgMeta.copy(computedLoudnessDb = gainDb, trackPeak = peak)
                                     rgLinearScalar = computeTrackPcmGainScalar(rgMeta, isSecondary)
                                     persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = true)
@@ -902,9 +887,9 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                         }
                     }
 
-                    // If short track ended between 1..24 blocks, still save computed LUFS
-                    if (lufsAnalyzer != null && !refinedLocked && lufsAnalyzer.completedBlocks >= 1) {
-                        lufsAnalyzer.computeCurrentGainAndPeak()?.let { (gainDb, peak) ->
+                    // If short track ended before 10s lock, still save computed LUFS
+                    if (lufsAnalyzer != null && !refinedLocked && lufsAnalyzer.processedFrames >= 64L) {
+                        lufsAnalyzer.currentReplayGainDbAndPeak()?.let { (gainDb, peak) ->
                             persistComputedLoudness(null, track.file.absolutePath, gainDb, peak, saveNow = true)
                         }
                     }
@@ -961,7 +946,7 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
     }
 
     private fun computeTrackPcmGainScalar(meta: ReplayGainMetadata, isSecondary: Boolean): Float {
-        val res = ReplayGainEngine.computeLinearMultiplier(
+        val res = ReplayGainTagService.computePlaybackAdjustment(
             metadata = meta,
             config = replayGainConfig,
             isAlbumSequentialContext = true
@@ -969,11 +954,11 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
         if (!isSecondary) {
             _activeReplayGain.value = res
         }
-        return if (res.appliedGainDb == 0f) {
-            1.0f
-        } else {
-            10.0.pow(res.appliedGainDb / 20.0).toFloat().coerceIn(0.05f, 3.2f)
-        }
+        return ReplayGainTagService.computeTotalLinearGain(
+            metadata = meta,
+            config = replayGainConfig,
+            isAlbumSequentialContext = true
+        )
     }
 
     private fun openDecodedPcmSource(
@@ -986,8 +971,8 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
 
         // 1. Pure-Kotlin zero-dependency NativePcmContainerDecoder for AIFF/AIFC, CAF, DSF, DFF, AU/SND
         // Works on all Windows/Linux setups even without FFmpeg installed, with instant random seek!
-        if (NativePcmContainerDecoder.supportsExtension(ext)) {
-            openNativeContainerPcmSource(song.file, ext, startOffsetMs)?.let { return it }
+        if (NativePcmContainerDecoder.isNativelyDecodableExtension(ext)) {
+            openNativeContainerPcmSource(song.file, startOffsetMs)?.let { return it }
         }
 
         // 2. SSE2-safe FFmpeg pipe for ALAC, APE, WV, M4A, MP4, MKV/MKA, WebM, Opus 5.1/7.1,
@@ -1034,13 +1019,12 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
 
     private fun openNativeContainerPcmSource(
         file: File,
-        ext: String,
         startOffsetMs: Long
     ): PcmFrameSource? {
         return try {
             val raf = RandomAccessFile(file, "r")
             val reader = rafToSeekableReader(raf)
-            val decoded = NativePcmContainerDecoder.open(reader, ext) ?: run {
+            val decoded = NativePcmContainerDecoder.open(reader) ?: run {
                 raf.close()
                 return null
             }
@@ -1048,18 +1032,11 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
                 decoded.seekToMs(startOffsetMs)
             }
             object : PcmFrameSource {
-                override val sampleRate: Float = decoded.sampleRate.toFloat()
-                override val channels: Int = decoded.channels
+                override val sampleRate: Float = decoded.outputSampleRate.toFloat()
+                override val channels: Int = 2
                 override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-                    if (offset == 0) {
-                        val n = decoded.readPcm16le(buffer, length)
-                        return if (n <= 0) -1 else n
-                    }
-                    val temp = ByteArray(length)
-                    val n = decoded.readPcm16le(temp, length)
-                    if (n <= 0) return -1
-                    temp.copyInto(buffer, offset, 0, n)
-                    return n
+                    val n = decoded.readStereoS16le(buffer, offset, length)
+                    return if (n <= 0) -1 else n
                 }
                 override fun close() {
                     runCatching { decoded.close() }
@@ -1072,8 +1049,9 @@ class DesktopAudioEngine(private val scope: CoroutineScope) {
 
     private fun rafToSeekableReader(raf: RandomAccessFile): SeekableByteReader = object : SeekableByteReader {
         override val length: Long get() = raf.length()
-        override fun seek(position: Long) = raf.seek(position)
-        override fun position(): Long = raf.filePointer
+        override var position: Long
+            get() = raf.filePointer
+            set(value) { raf.seek(value.coerceAtLeast(0L)) }
         override fun read(buffer: ByteArray, offset: Int, count: Int): Int = raf.read(buffer, offset, count)
         override fun close() = raf.close()
     }

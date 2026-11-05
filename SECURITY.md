@@ -1,32 +1,30 @@
-# Security Policy
+# Security Policy — Flow Music Player
 
 ## Supported Versions
 
-We release patches and security fixes for the latest version of Lune. Please ensure you are running the most up-to-date release before reporting a vulnerability.
+Security fixes and stability updates are provided for the latest release of **Flow Music Player** (`2.0.x`).
 
 | Version | Supported          |
 | ------- | ------------------ |
-| Latest  | :white_check_mark: |
-| < Latest| :x:                |
+| 2.0.x   | :white_check_mark: |
+| < 2.0   | :x:                |
+
+---
+
+## Privacy & Threat Model
+
+Flow Music Player operates **100% offline** with **zero network permissions** (`android.permission.INTERNET` is never requested). Security auditing focuses on:
+
+1. Safe parsing of local audio containers, tags (`jaudiotagger`), and `.lrc` lyric files.
+2. Bounded memory allocation when decoding untrusted media headers (`AIFF`, `CAF`, `DSF/DFF`, `MKV`, `MP4`, `ID3v2`, `Vorbis`).
+3. Scoped local storage and `MediaBrowserServiceCompat` / `AppWidgetProvider` intent validation.
 
 ---
 
 ## Reporting a Vulnerability
 
-We take the security and privacy of Lune seriously. Since Lune operates completely offline with zero network permissions, security risks are primarily centered around local intent handling, audio decoding vulnerabilities, and local storage safety.
+If you discover a security issue in Flow Music Player:
 
-If you discover a security vulnerability or potential exploit, please follow these guidelines:
-
-1. **Do not disclose publicly**: Please refrain from opening a public GitHub issue, discussion, or PR detailing the security flaw until it has been reviewed and addressed.
-2. **Contact method**: 
-   - Use GitHub's private vulnerability reporting feature via the [Security Advisories](https://github.com/MrDemonc/Lune/security/advisories) tab.
-   - Or contact the maintainer directly via GitHub profile details.
-3. **Include details**: Provide a clear description, reproducible steps, proof-of-concept (PoC) if applicable, and the affected device/Android OS version.
-
----
-
-## Response Process
-
-- **Acknowledgment**: You can expect an initial response within 48 to 72 hours.
-- **Assessment**: We will verify the vulnerability and determine the severity.
-- **Resolution**: Once patched, an update will be released with appropriate credits in the changelog (unless you prefer anonymity).
+1. Avoid posting exploit payloads publicly before a fix is available.
+2. Provide a concise description, reproduction steps, sample container metadata (if applicable), and target OS/Android API level.
+3. For vulnerabilities inherited from the upstream base project, you may also check upstream advisories at [MrDemonc/Lune](https://github.com/MrDemonc/Lune).

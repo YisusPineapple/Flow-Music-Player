@@ -87,4 +87,21 @@ data class Song(
             computedLoudnessDb = overrideComputedDb ?: computedLoudnessDb
         )
     }
+
+    fun toCoreTrack(): com.demonlab.lune.core.model.CoreTrack {
+        return com.demonlab.lune.core.model.CoreTrack(
+            id = id,
+            title = title,
+            artist = artist,
+            album = album,
+            genre = genre,
+            durationMs = duration,
+            trackNumber = trackNumber,
+            sampleRate = sampleRate,
+            bitDepth = bitDepth,
+            bitrate = bitrate,
+            formatCode = format,
+            channels = channels ?: 2
+        )
+    }
 }

@@ -1,7 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
+    kotlin("multiplatform")
     id("org.jetbrains.compose") version "1.8.0"
     alias(libs.plugins.kotlin.compose)
 }
@@ -53,7 +53,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "Flow"
-            packageVersion = "2.0.0"
+            packageVersion = "1.0.0"
             description = "Flow Ultra-Lightweight Multiplatform Music Player (Fork of Lune)"
             vendor = "Flow Audio Project"
 

@@ -302,8 +302,10 @@ fun SongItem(
     controlsColorPalette: Int = 0,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     onOptionsClick: (() -> Unit)? = null,
-    onFavoriteClick: ((Song) -> Unit)? = null
+    onFavoriteClick: ((Song) -> Unit)? = null,
+    isSelected: Boolean = false
 ) {
     val context = LocalContext.current
     val settingsManager = remember { SettingsManager.getInstance(context) }
@@ -371,15 +373,37 @@ fun SongItem(
         else -> 48.dp
     }
 
-    Surface(
-        modifier = modifier
+    val selectionBorder = if (isSelected) {
+        BorderStroke(2.dp, activePrimary)
+    } else itemBorder
+
+    val effectiveBg = if (isSelected) {
+        if (hasBlurBackground) Color.White.copy(alpha = 0.28f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+    } else cardBg
+
+    val effectiveModifier = if (onLongClick != null) {
+        modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPad, vertical = verticalPad)
-            .bounceClick(scaleDown = 0.96f),
-        onClick = onClick ?: {},
+            .clip(shape)
+            .combinedClickable(
+                onClick = { onClick?.invoke() },
+                onLongClick = { onLongClick() }
+            )
+            .bounceClick(scaleDown = 0.96f)
+    } else {
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPad, vertical = verticalPad)
+            .bounceClick(scaleDown = 0.96f)
+    }
+
+    Surface(
+        modifier = effectiveModifier,
+        onClick = if (onLongClick == null) (onClick ?: {}) else ({}),
         shape = shape,
-        color = cardBg,
-        border = itemBorder
+        color = effectiveBg,
+        border = selectionBorder
     ) {
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),

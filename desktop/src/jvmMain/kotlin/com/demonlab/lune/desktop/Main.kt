@@ -1004,7 +1004,7 @@ private fun DesktopSettingsPanel(
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Acerca de Flow (Fork de Lune)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "Flow v2.0.0 — Reproductor audiófilo multiplataforma ultraligero (< 180 MB RAM en PC) para Android, Windows y Linux.",
+                    text = "Flow v1.0 — Reproductor audiófilo multiplataforma ultraligero (< 180 MB RAM en PC) para Android, Windows y Linux.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(

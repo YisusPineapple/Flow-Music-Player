@@ -43,23 +43,29 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import kotlin.math.abs
 
 /**
  * Universal Bit-Depth + ITU-R BS.775 Multichannel-to-Stereo Downmix + Real-Time BS.1770 LUFS
- * AudioProcessor for Media3 ExoPlayer.
+ * + Sample-Accurate ReplayGain AudioProcessor for Media3 ExoPlayer.
  *
  * Accepts 8/16/24/32-bit Int (LE/BE) and 32-bit Float PCM across 1..8 channels so 24-bit ALAC,
- * 24/32-bit FLAC, 5.1/7.1 float Opus, E-AC3, AC-3, AC-4, DTS, MKV/MKA, MP4, and WebM streams
- * play reliably on any stereo Android DAC while calculating live K-weighted LUFS on untagged tracks.
+ * 24/32-bit FLAC, 5.1/7.1 float Opus, E-AC3, AC-3, AC-4, DTS, MKV/MKA, MP4, WebM, MP3, M4A,
+ * and OGG streams play gaplessly on any stereo Android DAC while applying click-free per-track
+ * ReplayGain/LUFS normalization and calculating live K-weighted LUFS on untagged tracks.
  */
 class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
 
     @Volatile var leftBalanceScalar: Float = 1.0f
     @Volatile var rightBalanceScalar: Float = 1.0f
+    @Volatile var targetReplayGainScalar: Float = 1.0f
+    @Volatile private var currentReplayGainScalar: Float = 1.0f
     @Volatile var liveLufsEnabled: Boolean = false
     @Volatile var activeSongPath: String = ""
 
     var onRealtimeLoudnessMeasured: ((songPath: String, gainDb: Float, peak: Float) -> Unit)? = null
+    val softwareEqDsp = com.demonlab.lune.core.dsp.SoftwareEqualizerDsp(48000)
+    private var eqFloatTemp = FloatArray(0)
 
     private var inTemp = ByteArray(0)
     private var s16MultiTemp = ByteArray(0)
@@ -92,6 +98,14 @@ class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
             2,
             C.ENCODING_PCM_16BIT
         )
+    }
+
+    fun setReplayGainScalar(scalar: Float, immediate: Boolean = false) {
+        val clamped = scalar.coerceIn(0.03f, 3.98f)
+        targetReplayGainScalar = clamped
+        if (immediate) {
+            currentReplayGainScalar = clamped
+        }
     }
 
     fun resetLiveAnalyzerForTrack(songPath: String, needsAnalysis: Boolean) {
@@ -154,7 +168,7 @@ class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
             outStereoBuffer = outTemp
         )
 
-        // Step 3: Real-time K-weighted LUFS measurement for untagged tracks
+        // Step 3: Real-time K-weighted LUFS measurement on unscaled audio for untagged tracks
         if (liveLufsEnabled && writtenBytes > 0) {
             val curPath = activeSongPath
             if (curPath != trackedPathForAnalyzer) {
@@ -181,12 +195,23 @@ class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
             }
         }
 
-        // Step 4: Stereo balance scaling
-        val lGain = leftBalanceScalar
-        val rGain = rightBalanceScalar
-        if (lGain < 0.999f || rGain < 0.999f) {
+        // Step 4: Click-free per-track ReplayGain/LUFS + Stereo Balance scaling
+        val lBal = leftBalanceScalar
+        val rBal = rightBalanceScalar
+        val targetRg = targetReplayGainScalar
+        var curRg = currentReplayGainScalar
+        val needsScaling = abs(targetRg - 1.0f) > 0.001f ||
+            abs(curRg - 1.0f) > 0.001f ||
+            lBal < 0.999f ||
+            rBal < 0.999f
+
+        if (needsScaling) {
             var i = 0
             while (i + 3 < writtenBytes) {
+                curRg += (targetRg - curRg) * 0.004f
+                val lGain = curRg * lBal
+                val rGain = curRg * rBal
+
                 val lLo = outTemp[i].toInt() and 0xFF
                 val lHi = outTemp[i + 1].toInt()
                 val lScaled = (((lHi shl 8) or lLo) * lGain).toInt().coerceIn(-32768, 32767)
@@ -199,6 +224,39 @@ class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
                 outTemp[i + 2] = (rScaled and 0xFF).toByte()
                 outTemp[i + 3] = ((rScaled shr 8) and 0xFF).toByte()
                 i += 4
+            }
+            if (abs(targetRg - curRg) < 0.0005f) {
+                curRg = targetRg
+            }
+            currentReplayGainScalar = curRg
+        }
+
+        // Step 5: Software Equalizer DSP (Parametric Biquads + Preamp + Anti-Clipping Limiter)
+        if (softwareEqDsp.isEnabled || softwareEqDsp.preampDb != 0f || softwareEqDsp.bassBoostAmount > 0f) {
+            val totalStereoSamples = writtenBytes / 2
+            if (eqFloatTemp.size < totalStereoSamples) {
+                eqFloatTemp = FloatArray(totalStereoSamples)
+            }
+            softwareEqDsp.setSampleRateSafe(inputAudioFormat.sampleRate.coerceAtLeast(8000))
+
+            var si = 0
+            var fi = 0
+            while (si + 1 < writtenBytes) {
+                val lo = outTemp[si].toInt() and 0xFF
+                val hi = outTemp[si + 1].toInt()
+                eqFloatTemp[fi++] = ((hi shl 8) or lo) / 32768.0f
+                si += 2
+            }
+
+            softwareEqDsp.processInterleavedStereo(eqFloatTemp, 0, totalStereoSamples)
+
+            si = 0
+            fi = 0
+            while (si + 1 < writtenBytes) {
+                val sample = (eqFloatTemp[fi++] * 32767.0f).toInt().coerceIn(-32768, 32767)
+                outTemp[si] = (sample and 0xFF).toByte()
+                outTemp[si + 1] = ((sample shr 8) and 0xFF).toByte()
+                si += 2
             }
         }
 
@@ -283,20 +341,23 @@ class MultichannelStereoBalanceProcessor : BaseAudioProcessor() {
 }
 
 /**
- * Extended format & container playback engine for Flow on Android.
+ * Extended format, ReplayGain, and sample-accurate Gapless playback engine for Flow on Android.
  *
- * Dual-tier architecture with tight memory caps (< 8 MB buffer ceiling):
- * 1. Media3 ExoPlayer + [MultichannelStereoBalanceProcessor]: ALAC, FLAC, WAV, MP4, M4A, MKV/MKA,
- *    WebM, Opus (Stereo & 5.1/7.1), E-AC3, AC-3, AC-4, DTS, WMA, OGG, AAC, MP3.
+ * Dual-tier architecture with tight memory caps (< 6 MB buffer ceiling):
+ * 1. Media3 ExoPlayer + [MultichannelStereoBalanceProcessor]: Pre-buffers the next track in the
+ *    playlist queue for true zero-gap transitions across MP3 (Xing/LAME/iTunSMPB gapless tags),
+ *    FLAC, ALAC, WAV, MP4, M4A, MKV/MKA, WebM, Opus (Stereo & 5.1/7.1), E-AC3, AC-3, AC-4, DTS,
+ *    WMA, OGG, and AAC.
  * 2. Pure-Kotlin [NativePcmContainerDecoder] + [AudioTrack]: AIFF/AIF/AIFC, CAF, DSF (DSD64/128/256),
- *    DFF/DSDIFF, AU/SND — guaranteed playback on ALL Android 7.0+ devices with zero JNI bloat!
+ *    DFF/DSDIFF, AU/SND — guaranteed gapless playback on ALL Android 7.0+ devices with zero JNI bloat.
  */
 class ExtendedFormatPlayer(private val context: Context) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val stereoProcessor = MultichannelStereoBalanceProcessor()
     private var exoPlayer: ExoPlayer? = null
-    private var queuedGaplessSongId: Long? = null
+    private var queuedGaplessSong: Song? = null
+    private var queuedGaplessGainScalar: Float = 1.0f
     private var currentActiveSong: Song? = null
 
     // Native PCM/DSD AudioTrack state (AIFF, AIFC, CAF, DSF, DFF, AU)
@@ -310,6 +371,8 @@ class ExtendedFormatPlayer(private val context: Context) {
     @Volatile private var nativeDurationMs: Int = 0
     @Volatile private var nativeLoopSingle: Boolean = false
     @Volatile private var nativeQueuedNextSong: Song? = null
+    @Volatile private var nativeQueuedNextGainScalar: Float = 1.0f
+    @Volatile private var nativeTargetGainScalar: Float = 1.0f
     @Volatile private var leftVol: Float = 1.0f
     @Volatile private var rightVol: Float = 1.0f
 
@@ -356,6 +419,9 @@ class ExtendedFormatPlayer(private val context: Context) {
             exoPlayer?.audioSessionId ?: 0
         }
 
+    val queuedNextSongId: Long?
+        get() = queuedGaplessSong?.id
+
     private fun ensurePlayer(): ExoPlayer {
         exoPlayer?.let { return it }
 
@@ -378,16 +444,18 @@ class ExtendedFormatPlayer(private val context: Context) {
             .setMp3ExtractorFlags(Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING)
             .setAdtsExtractorFlags(AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING)
 
-        // Memory-capped LoadControl (< 6 MB max buffer so local files never bloat Android RAM)
+        // Memory-capped LoadControl with zero back-buffer retention and 6 MB forward window
+        // so ExoPlayer pre-buffers the next track in the playlist queue ahead of track end.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 2500,
-                /* maxBufferMs = */ 8000,
-                /* bufferForPlaybackMs = */ 500,
-                /* bufferForPlaybackAfterRebufferMs = */ 1000
+                /* minBufferMs = */ 3000,
+                /* maxBufferMs = */ 10000,
+                /* bufferForPlaybackMs = */ 400,
+                /* bufferForPlaybackAfterRebufferMs = */ 900
             )
-            .setTargetBufferBytes(4 * 1024 * 1024)
+            .setTargetBufferBytes(6 * 1024 * 1024)
             .setPrioritizeTimeOverSizeThresholds(false)
+            .setBackBuffer(/* backBufferDurationMs = */ 0, /* retainBackBufferFromKeyframe = */ false)
             .build()
 
         val attrs = AudioAttributes.Builder()
@@ -401,6 +469,7 @@ class ExtendedFormatPlayer(private val context: Context) {
             .setMediaSourceFactory(DefaultMediaSourceFactory(context, extractorsFactory))
             .setLoadControl(loadControl)
             .setAudioAttributes(attrs, false)
+            .setPauseAtEndOfMediaItems(false)
             .build()
 
         created.addListener(object : Player.Listener {
@@ -415,9 +484,25 @@ class ExtendedFormatPlayer(private val context: Context) {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && mediaItem != null) {
-                    val transitionedId = mediaItem.mediaId.toLongOrNull()
+                    // Prune finished head items so internal queue stays bounded to [current, next]
+                    if (created.currentMediaItemIndex > 0) {
+                        created.removeMediaItems(0, created.currentMediaItemIndex)
+                    }
+                    val promotedSong = queuedGaplessSong
+                    val promotedGain = queuedGaplessGainScalar
+                    queuedGaplessSong = null
+                    queuedGaplessGainScalar = 1.0f
+
+                    if (promotedSong != null) {
+                        currentActiveSong = promotedSong
+                        val needsLiveLufs = !promotedSong.toReplayGainMetadata().hasEmbeddedTags &&
+                            promotedSong.computedLoudnessDb == null
+                        stereoProcessor.resetLiveAnalyzerForTrack(promotedSong.path, needsLiveLufs)
+                        setTrackReplayGainScalar(promotedGain, immediate = false)
+                    }
+
+                    val transitionedId = mediaItem.mediaId.toLongOrNull() ?: promotedSong?.id
                     if (transitionedId != null) {
-                        queuedGaplessSongId = null
                         onGaplessTransition?.invoke(transitionedId)
                     }
                 } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK ||
@@ -429,7 +514,13 @@ class ExtendedFormatPlayer(private val context: Context) {
 
             override fun onPlayerError(error: PlaybackException) {
                 val fallbackSong = currentActiveSong
-                if (fallbackSong != null && tryStartNativeContainerEngine(fallbackSong, loopSingle = created.repeatMode == Player.REPEAT_MODE_ONE, speed = created.playbackParameters.speed, pitch = created.playbackParameters.pitch)) {
+                if (fallbackSong != null && tryStartNativeContainerEngine(
+                        song = fallbackSong,
+                        loopSingle = created.repeatMode == Player.REPEAT_MODE_ONE,
+                        speed = created.playbackParameters.speed,
+                        pitch = created.playbackParameters.pitch
+                    )
+                ) {
                     runCatching { created.stop() }
                     return
                 }
@@ -562,6 +653,7 @@ class ExtendedFormatPlayer(private val context: Context) {
             var reportedEarly = false
             var reportedRefined = false
             var framesWrittenForTrack = 0L
+            var currentGain = nativeTargetGainScalar
 
             try {
                 while (!nativeStopRequested && activeStream != null) {
@@ -588,6 +680,7 @@ class ExtendedFormatPlayer(private val context: Context) {
                             continue
                         }
                         val nextQueued = nativeQueuedNextSong
+                        val nextGain = nativeQueuedNextGainScalar
                         if (nextQueued != null) {
                             val nextReader = openSongReader(nextQueued)
                             val nextDecoded = nextReader?.let { r ->
@@ -596,9 +689,11 @@ class ExtendedFormatPlayer(private val context: Context) {
                             if (nextDecoded != null && nextDecoded.outputSampleRate == stream.outputSampleRate) {
                                 stream.close()
                                 activeSong = nextQueued
+                                currentActiveSong = nextQueued
                                 activeStream = nextDecoded
                                 nativeQueuedNextSong = null
-                                queuedGaplessSongId = null
+                                queuedGaplessSong = null
+                                nativeTargetGainScalar = nextGain
                                 framesWrittenForTrack = 0L
                                 nativePositionMs = 0
                                 nativeDurationMs = if (nextDecoded.durationMs > 0L) nextDecoded.durationMs.toInt() else nextQueued.duration.toInt()
@@ -631,6 +726,24 @@ class ExtendedFormatPlayer(private val context: Context) {
                             lufs.currentReplayGainDbAndPeak()?.let { (g, pk) ->
                                 mainHandler.post { onRealtimeLoudnessMeasured?.invoke(songPath, g, pk) }
                             }
+                        }
+                    }
+
+                    // Apply ReplayGain/LUFS multiplier smoothly in PCM sample domain
+                    val targetGain = nativeTargetGainScalar
+                    if (abs(targetGain - 1.0f) > 0.001f || abs(currentGain - 1.0f) > 0.001f) {
+                        var sIdx = 0
+                        while (sIdx + 1 < n) {
+                            currentGain += (targetGain - currentGain) * 0.002f
+                            val lo = pcmBuf[sIdx].toInt() and 0xFF
+                            val hi = pcmBuf[sIdx + 1].toInt()
+                            val scaled = (((hi shl 8) or lo) * currentGain).toInt().coerceIn(-32768, 32767)
+                            pcmBuf[sIdx] = (scaled and 0xFF).toByte()
+                            pcmBuf[sIdx + 1] = ((scaled shr 8) and 0xFF).toByte()
+                            sIdx += 2
+                        }
+                        if (abs(targetGain - currentGain) < 0.0005f) {
+                            currentGain = targetGain
                         }
                     }
 
@@ -692,9 +805,24 @@ class ExtendedFormatPlayer(private val context: Context) {
         usingNativeTrackEngine = false
     }
 
-    fun playSong(song: Song, loopSingle: Boolean, speed: Float, pitch: Float) {
+    fun setTrackReplayGainScalar(scalar: Float, immediate: Boolean = false) {
+        val safeScalar = scalar.coerceIn(0.03f, 3.98f)
+        nativeTargetGainScalar = safeScalar
+        stereoProcessor.setReplayGainScalar(safeScalar, immediate)
+    }
+
+    fun playSong(
+        song: Song,
+        loopSingle: Boolean,
+        speed: Float,
+        pitch: Float,
+        initialReplayGainScalar: Float = 1.0f
+    ) {
         currentActiveSong = song
-        queuedGaplessSongId = null
+        queuedGaplessSong = null
+        queuedGaplessGainScalar = 1.0f
+        setTrackReplayGainScalar(initialReplayGainScalar, immediate = true)
+
         val ext = song.path.substringAfterLast('.', song.format).lowercase().trim()
         val needsLiveLufs = !song.toReplayGainMetadata().hasEmbeddedTags && song.computedLoudnessDb == null
 
@@ -714,35 +842,58 @@ class ExtendedFormatPlayer(private val context: Context) {
         player.playWhenReady = true
     }
 
-    fun queueNextGapless(nextSong: Song?) {
+    /**
+     * Pre-buffers [nextSong] as the trailing [MediaItem] in ExoPlayer's playlist queue (or native
+     * stream handoff slot) so Media3 decodes its header and initial PCM frames ahead of time for
+     * seamless zero-gap playback transition, carrying [nextReplayGainScalar] for the incoming track.
+     */
+    fun queueNextGapless(nextSong: Song?, nextReplayGainScalar: Float = 1.0f) {
+        val clampedNextGain = nextReplayGainScalar.coerceIn(0.03f, 3.98f)
         if (usingNativeTrackEngine) {
-            nativeQueuedNextSong = nextSong
-            queuedGaplessSongId = nextSong?.id
+            nativeQueuedNextSong = if (nativeLoopSingle) null else nextSong
+            nativeQueuedNextGainScalar = clampedNextGain
+            queuedGaplessSong = nativeQueuedNextSong
+            queuedGaplessGainScalar = clampedNextGain
             return
         }
+
         val player = exoPlayer ?: return
-        if (nextSong == null) {
-            if (player.mediaItemCount > 1) {
-                player.removeMediaItems(1, player.mediaItemCount)
+        val curIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+        val trailingIndex = curIndex + 1
+
+        if (nextSong == null || player.repeatMode == Player.REPEAT_MODE_ONE) {
+            if (player.mediaItemCount > trailingIndex) {
+                player.removeMediaItems(trailingIndex, player.mediaItemCount)
             }
-            queuedGaplessSongId = null
+            queuedGaplessSong = null
+            queuedGaplessGainScalar = 1.0f
             return
         }
+
         val nextExt = nextSong.path.substringAfterLast('.', nextSong.format).lowercase().trim()
         if (NativePcmContainerDecoder.isNativelyDecodableExtension(nextExt)) {
-            // Will transition cleanly on completion into native container decoder
-            if (player.mediaItemCount > 1) {
-                player.removeMediaItems(1, player.mediaItemCount)
+            // Will transition cleanly on STATE_ENDED into NativePcmContainerDecoder
+            if (player.mediaItemCount > trailingIndex) {
+                player.removeMediaItems(trailingIndex, player.mediaItemCount)
             }
-            queuedGaplessSongId = null
+            queuedGaplessSong = null
+            queuedGaplessGainScalar = 1.0f
             return
         }
-        if (queuedGaplessSongId == nextSong.id && player.mediaItemCount >= 2) return
-        if (player.mediaItemCount > 1) {
-            player.removeMediaItems(1, player.mediaItemCount)
+
+        if (queuedGaplessSong?.id == nextSong.id && player.mediaItemCount > trailingIndex) {
+            // Keep ExoPlayer's already pre-buffered MediaSource intact; update only its gain scalar
+            queuedGaplessSong = nextSong
+            queuedGaplessGainScalar = clampedNextGain
+            return
+        }
+
+        if (player.mediaItemCount > trailingIndex) {
+            player.removeMediaItems(trailingIndex, player.mediaItemCount)
         }
         player.addMediaItem(buildMediaItem(nextSong))
-        queuedGaplessSongId = nextSong.id
+        queuedGaplessSong = nextSong
+        queuedGaplessGainScalar = clampedNextGain
     }
 
     fun setStereoVolume(left: Float, right: Float) {
@@ -767,6 +918,9 @@ class ExtendedFormatPlayer(private val context: Context) {
     fun setLooping(loop: Boolean) {
         nativeLoopSingle = loop
         exoPlayer?.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        if (loop) {
+            queueNextGapless(null)
+        }
     }
 
     fun setPlaybackSpeedAndPitch(speed: Float, pitch: Float) {
@@ -802,11 +956,29 @@ class ExtendedFormatPlayer(private val context: Context) {
             nativeSeekPendingMs = clamped.toLong()
             return
         }
-        exoPlayer?.seekTo(positionMs.toLong().coerceAtLeast(0L))
+        val player = exoPlayer ?: return
+        player.seekTo(player.currentMediaItemIndex.coerceAtLeast(0), positionMs.toLong().coerceAtLeast(0L))
+    }
+
+    fun syncEqualizerDsp(
+        enabled: Boolean,
+        bandGainsDb: FloatArray,
+        preampDb: Float,
+        autoHeadroom: Boolean,
+        bassBoostAmount: Float
+    ) {
+        val dsp = stereoProcessor.softwareEqDsp
+        dsp.isEnabled = enabled
+        dsp.setAllGains(bandGainsDb)
+        dsp.preampDb = preampDb
+        dsp.autoHeadroomEnabled = autoHeadroom
+        dsp.bassBoostAmount = bassBoostAmount
+        dsp.recalculateCoefficients()
     }
 
     fun release() {
-        queuedGaplessSongId = null
+        queuedGaplessSong = null
+        queuedGaplessGainScalar = 1.0f
         currentActiveSong = null
         stopNativeTrackEngine()
         exoPlayer?.let {

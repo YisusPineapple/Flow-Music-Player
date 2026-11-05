@@ -832,7 +832,7 @@ fun SettingsScreen(
                         supportingText = stringResource(R.string.export_playlists_desc),
                         icon = Icons.Default.CloudDownload,
                         position = SectionPosition.FIRST,
-                        onClick = { exportLauncher.launch("playlists_backup.json") }
+                        onClick = { exportLauncher.launch("flow_playlists_backup.json") }
                     )
                     SettingsPreferenceItem(
                         headlineText = stringResource(R.string.import_playlists),

@@ -88,8 +88,7 @@ fun OnboardingScreen(
             5 -> ManageFilesPermissionStep(onNext = { currentStep = 6 })
             6 -> FolderVisibilityStep(onNext = { currentStep = 7 })
             7 -> PermissionsReminderStep(onNext = { currentStep = 8 })
-            8 -> SupportStep(onNext = { currentStep = 9 })
-            9 -> FeaturesStep(onFinish = onStartClick)
+            8 -> FeaturesStep(onFinish = onStartClick)
         }
     }
 }
@@ -218,16 +217,20 @@ fun PermissionStep(onNext: () -> Unit) {
         isPermissionGranted = granted
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = remember { SettingsManager.getInstance(context) }.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -355,16 +358,20 @@ fun BluetoothPermissionStep(onNext: () -> Unit) {
         isPermissionGranted = granted
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = remember { SettingsManager.getInstance(context) }.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -492,16 +499,20 @@ fun NotificationPermissionStep(onNext: () -> Unit) {
         isPermissionGranted = granted
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = remember { SettingsManager.getInstance(context) }.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -618,16 +629,20 @@ fun MusicPermissionStep(onNext: () -> Unit) {
         isPermissionGranted = granted
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = remember { SettingsManager.getInstance(context) }.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -761,16 +776,20 @@ fun ManageFilesPermissionStep(onNext: () -> Unit) {
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = settingsManager.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -874,16 +893,20 @@ fun FolderVisibilityStep(onNext: () -> Unit) {
         mutableStateOf(settingsManager.showAllFoldersOnStart)
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotationVisibility")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val lowResource = settingsManager.isLowResourceVisualsActive(context)
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotationVisibility")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -1005,9 +1028,11 @@ fun FeaturesStep(onFinish: () -> Unit) {
 
     val pagerState = rememberPagerState(pageCount = { features.size })
 
+    val context = LocalContext.current
+    val lowResource = remember { SettingsManager.getInstance(context) }.isLowResourceVisualsActive(context)
     // Particle state
-    val particles = remember {
-        List(40) {
+    val particles = remember(lowResource) {
+        if (lowResource) emptyList() else List(40) {
             val angle = Math.random() * 2 * Math.PI
             val speed = 120f + (Math.random() * 480f).toFloat()
             val vx = (Math.cos(angle) * speed).toFloat()
@@ -1018,29 +1043,34 @@ fun FeaturesStep(onFinish: () -> Unit) {
 
     LaunchedEffect(isExploding) {
         if (isExploding) {
-            explosionProgress.animateTo(
-                1f,
-                animationSpec = tween(durationMillis = 850, easing = LinearOutSlowInEasing)
-            )
-            delay(100)
-            fadeProgress.animateTo(
-                1f,
-                animationSpec = tween(durationMillis = 650, easing = LinearEasing)
-            )
+            if (!lowResource) {
+                explosionProgress.animateTo(
+                    1f,
+                    animationSpec = tween(durationMillis = 850, easing = LinearOutSlowInEasing)
+                )
+                delay(100)
+                fadeProgress.animateTo(
+                    1f,
+                    animationSpec = tween(durationMillis = 450, easing = LinearEasing)
+                )
+            }
             onFinish()
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotation")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Box(
         modifier = Modifier
@@ -1242,20 +1272,25 @@ data class FeatureItem(val title: String, val icon: ImageVector)
 
 @Composable
 fun PermissionsReminderStep(onNext: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager.getInstance(context) }
+    val lowResource = settingsManager.isLowResourceVisualsActive(context)
     val diamondsColor = MaterialTheme.colorScheme.primary
-    val iconColor = MaterialTheme.colorScheme.onSurface
+    val iconColor = MaterialTheme.colorScheme.onPrimary
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotationReminder")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
+    val rotation = if (!lowResource) {
+        val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotationReminder")
+        val rot by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "LogoRotation"
+        )
+        rot
+    } else 0f
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -1281,7 +1316,7 @@ fun PermissionsReminderStep(onNext: () -> Unit) {
                         .graphicsLayer(rotationZ = rotation)
                 )
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.Security,
+                    imageVector = Icons.Default.Security,
                     contentDescription = null,
                     tint = iconColor,
                     modifier = Modifier.size(50.dp)
@@ -1325,87 +1360,4 @@ fun PermissionsReminderStep(onNext: () -> Unit) {
     }
 }
 
-@Composable
-fun SupportStep(onNext: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
-    val diamondsColor = if (isDark) Color.White else Color.Black
-    val iconColor = if (isDark) Color.Black else Color.White
-
-    val infiniteTransition = rememberInfiniteTransition(label = "InfiniteLogoRotationSupport")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LogoRotation"
-    )
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(200.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_logo_diamonds),
-                    contentDescription = null,
-                    tint = diamondsColor,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(rotationZ = rotation)
-                )
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(50.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = stringResource(R.string.onboarding_support_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(R.string.onboarding_support_desc),
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Button(
-                onClick = onNext,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    stringResource(R.string.onboarding_next_button),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
 

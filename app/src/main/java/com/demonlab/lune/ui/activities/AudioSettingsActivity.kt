@@ -559,7 +559,7 @@ fun AudioSettingsScreen(onBack: () -> Unit) {
                         headlineText = stringResource(R.string.stop_on_task_removed),
                         supportingText = stringResource(R.string.stop_on_task_removed_desc),
                         icon = Icons.AutoMirrored.Filled.ExitToApp,
-                        position = SectionPosition.LAST,
+                        position = SectionPosition.MIDDLE,
                         trailingContent = {
                             BouncySwitch(
                                 checked = stopOnTaskRemoved,
@@ -575,6 +575,140 @@ fun AudioSettingsScreen(onBack: () -> Unit) {
                                     )
                                 }
                             )
+                        }
+                    )
+
+                    var audioDucking by remember { mutableStateOf(settingsManager.audioDuckingEnabled) }
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.setting_ducking_title),
+                        supportingText = stringResource(R.string.setting_ducking_desc),
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        position = SectionPosition.MIDDLE,
+                        trailingContent = {
+                            BouncySwitch(
+                                checked = audioDucking,
+                                onCheckedChange = {
+                                    audioDucking = it
+                                    settingsManager.audioDuckingEnabled = it
+                                },
+                                thumbContent = {
+                                    Icon(
+                                        imageVector = if (audioDucking) Icons.Default.Check else Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
+                    )
+
+                    var pauseOnNoisy by remember { mutableStateOf(settingsManager.pauseOnNoisyDisconnect) }
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.setting_noisy_title),
+                        supportingText = stringResource(R.string.setting_noisy_desc),
+                        icon = Icons.Default.MusicNote,
+                        position = SectionPosition.MIDDLE,
+                        trailingContent = {
+                            BouncySwitch(
+                                checked = pauseOnNoisy,
+                                onCheckedChange = {
+                                    pauseOnNoisy = it
+                                    settingsManager.pauseOnNoisyDisconnect = it
+                                },
+                                thumbContent = {
+                                    Icon(
+                                        imageVector = if (pauseOnNoisy) Icons.Default.Check else Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
+                    )
+
+                    var resumeOnConnect by remember { mutableStateOf(settingsManager.resumeOnOutputConnect) }
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.setting_resume_connect_title),
+                        supportingText = stringResource(R.string.setting_resume_connect_desc),
+                        icon = Icons.Default.GraphicEq,
+                        position = SectionPosition.MIDDLE,
+                        trailingContent = {
+                            BouncySwitch(
+                                checked = resumeOnConnect,
+                                onCheckedChange = {
+                                    resumeOnConnect = it
+                                    settingsManager.resumeOnOutputConnect = it
+                                },
+                                thumbContent = {
+                                    Icon(
+                                        imageVector = if (resumeOnConnect) Icons.Default.Check else Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
+                    )
+
+                    var fadeOnPlayPause by remember { mutableStateOf(settingsManager.fadeOnPlayPause) }
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.setting_fade_title),
+                        supportingText = stringResource(R.string.setting_fade_desc),
+                        icon = Icons.Default.Tune,
+                        position = SectionPosition.MIDDLE,
+                        trailingContent = {
+                            BouncySwitch(
+                                checked = fadeOnPlayPause,
+                                onCheckedChange = {
+                                    fadeOnPlayPause = it
+                                    settingsManager.fadeOnPlayPause = it
+                                },
+                                thumbContent = {
+                                    Icon(
+                                        imageVector = if (fadeOnPlayPause) Icons.Default.Check else Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
+                    )
+
+                    var skipSeconds by remember { mutableIntStateOf(settingsManager.skipShortTracksSeconds) }
+                    SettingsPreferenceItem(
+                        headlineText = stringResource(R.string.setting_skip_short_title),
+                        supportingText = if (skipSeconds > 0) "${stringResource(R.string.setting_skip_short_desc)} (${skipSeconds}s)" else stringResource(R.string.setting_skip_short_desc),
+                        icon = Icons.Default.GraphicEq,
+                        position = SectionPosition.LAST,
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                FilterChip(
+                                    selected = skipSeconds == 0,
+                                    onClick = {
+                                        skipSeconds = 0
+                                        settingsManager.skipShortTracksSeconds = 0
+                                    },
+                                    label = { Text("0s") }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                FilterChip(
+                                    selected = skipSeconds == 15,
+                                    onClick = {
+                                        skipSeconds = 15
+                                        settingsManager.skipShortTracksSeconds = 15
+                                    },
+                                    label = { Text("15s") }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                FilterChip(
+                                    selected = skipSeconds == 30,
+                                    onClick = {
+                                        skipSeconds = 30
+                                        settingsManager.skipShortTracksSeconds = 30
+                                    },
+                                    label = { Text("30s") }
+                                )
+                            }
                         }
                     )
                 }

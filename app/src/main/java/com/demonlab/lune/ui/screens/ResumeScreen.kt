@@ -205,6 +205,7 @@ fun ResumeScreen(
                 useCustomControlsColor = useCustomControlsColor,
                 controlsColorPalette = controlsColorPalette,
                 playbackProgress = playbackProgress,
+                allSongs = allSongs,
                 onContinueListening = onExpandPlayer,
                 onPlayToggle = onPlayToggle
             )
