@@ -35,8 +35,33 @@ import com.demonlab.lune.core.search.PhoneticSearchEngine
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
-import javax.swing.JFileChooser
+import javax.swing.UIManager
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private fun chooseMusicFolderWithZenity(initialDir: String): File? {
+    return try {
+        val process = ProcessBuilder(
+            "zenity",
+            "--file-selection",
+            "--directory",
+            "--title=Seleccionar carpeta de música",
+            "--filename=$initialDir/"
+        ).redirectErrorStream(true).start()
+
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        process.waitFor()
+
+        if (process.exitValue() == 0 && output.isNotEmpty()) {
+            val dir = File(output)
+            if (dir.exists() && dir.isDirectory) dir else null
+        } else null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
 
 private enum class DesktopTab {
     TRACKS,
@@ -47,6 +72,10 @@ private enum class DesktopTab {
 }
 
 fun main() = application {
+    try {
+        UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel")
+    } catch (_: Exception) {}
+
     val windowState = rememberWindowState(width = 1120.dp, height = 740.dp)
     Window(
         onCloseRequest = ::exitApplication,
@@ -211,13 +240,12 @@ fun FlowDesktopApp() {
                         header = {
                             FilledTonalIconButton(
                                 onClick = {
-                                    val chooser = JFileChooser(settings.lastMusicFolder).apply {
-                                        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-                                    }
-                                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                                        val selected = chooser.selectedFile
-                                        updateSettings(settings.copy(lastMusicFolder = selected.absolutePath))
-                                        scope.launch {
+                                    scope.launch {
+                                        val selected = withContext(Dispatchers.IO) {
+                                            chooseMusicFolderWithZenity(settings.lastMusicFolder)
+                                        }
+                                        if (selected != null) {
+                                            updateSettings(settings.copy(lastMusicFolder = selected.absolutePath))
                                             songs = engine.scanFolder(selected, settings.multiTagConfig, forceRescan = false)
                                         }
                                     }
